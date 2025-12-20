@@ -1,6 +1,6 @@
 # Internacia Python SDK
 
-A Python SDK for accessing [internacia-db](https://github.com/commondataio/internacia-db) data with support for countries, international blocks, and fuzzy search across multiple languages.
+A Python SDK for accessing [internacia-db](https://github.com/datenoio/internacia-db) data with support for countries, international blocks, and fuzzy search across multiple languages.
 
 ## Features
 
@@ -631,7 +631,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Related Projects
 
-- [internacia-db](https://github.com/commondataio/internacia-db): The data repository
+- [internacia-db](https://github.com/datenoio/internacia-db): The data repository
 - [internacia-api](https://github.com/commondataio/internacia-api): REST API for internacia-db
 
 ## Changelog

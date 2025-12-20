@@ -121,10 +121,12 @@ class IntblocksClient:
         Returns:
             List of block dictionaries
         """
+        # In DuckDB, when UNNESTing a list of structs, the result column is named 'unnest'
+        # and contains the struct. Access struct fields using unnest.field
         query = """
             SELECT DISTINCT i.*
             FROM intblocks i, UNNEST(i.includes) AS member
-            WHERE member.id = ?
+            WHERE unnest.id = ?
         """
         results = self._db.execute_query_dict(query, (country_code.upper(),))
         return results

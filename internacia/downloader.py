@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # GitHub API endpoints
 GITHUB_API_BASE = "https://api.github.com"
-GITHUB_REPO = "commondataio/internacia-db"
+GITHUB_REPO = "datenoio/internacia-db"
 GITHUB_RELEASES_URL = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/releases"
 GITHUB_LATEST_RELEASE_URL = f"{GITHUB_RELEASES_URL}/latest"
 
@@ -83,6 +83,23 @@ def get_latest_version() -> str:
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
         )
+        
+        # Handle 404 specifically with a helpful error message
+        if response.status_code == 404:
+            error_msg = (
+                f"Repository or release not found at {GITHUB_REPO}.\n"
+                "This could mean:\n"
+                "  1. The repository doesn't exist or has been renamed\n"
+                "  2. The repository has no releases yet\n"
+                "  3. The repository is private and requires authentication\n\n"
+                "Alternative: You can build the database locally by:\n"
+                "  1. Cloning the internacia-db repository\n"
+                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
+                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
+            )
+            logger.error(error_msg)
+            raise DownloadError(error_msg)
+        
         response.raise_for_status()
 
         data = response.json()
@@ -94,6 +111,24 @@ def get_latest_version() -> str:
         logger.info("Latest version: %s", version)
         return version
 
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            # Already handled above, but catch here for safety
+            error_msg = (
+                f"Repository or release not found at {GITHUB_REPO}.\n"
+                "This could mean:\n"
+                "  1. The repository doesn't exist or has been renamed\n"
+                "  2. The repository has no releases yet\n"
+                "  3. The repository is private and requires authentication\n\n"
+                "Alternative: You can build the database locally by:\n"
+                "  1. Cloning the internacia-db repository\n"
+                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
+                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
+            )
+            logger.error(error_msg)
+            raise DownloadError(error_msg) from e
+        logger.error("Failed to fetch latest version: %s", str(e))
+        raise DownloadError("Failed to fetch latest version: %s" % str(e)) from e
     except requests.exceptions.RequestException as e:
         logger.error("Failed to fetch latest version: %s", str(e))
         raise DownloadError("Failed to fetch latest version: %s" % str(e)) from e
@@ -130,6 +165,25 @@ def get_database_info(version: Optional[str] = None) -> dict:
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
         )
+        
+        # Handle 404 specifically with a helpful error message
+        if response.status_code == 404:
+            error_msg = (
+                f"Release not found for {GITHUB_REPO}"
+                + (f" (version: {version})" if version else "") + ".\n"
+                "This could mean:\n"
+                "  1. The repository doesn't exist or has been renamed\n"
+                "  2. The specified version doesn't exist\n"
+                "  3. The repository has no releases yet\n"
+                "  4. The repository is private and requires authentication\n\n"
+                "Alternative: You can build the database locally by:\n"
+                "  1. Cloning the internacia-db repository\n"
+                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
+                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
+            )
+            logger.error(error_msg)
+            raise DownloadError(error_msg)
+        
         response.raise_for_status()
 
         data = response.json()
@@ -143,7 +197,41 @@ def get_database_info(version: Optional[str] = None) -> dict:
                 break
 
         if not db_asset:
-            raise VersionError(f"No database file found in release {version or 'latest'}")
+            release_tag = data.get("tag_name", version or "latest")
+            asset_names = [asset.get("name", "") for asset in assets] if assets else []
+            
+            error_msg = (
+                f"No database file (.duckdb) found in release {release_tag}.\n"
+            )
+            
+            if assets:
+                error_msg += (
+                    f"Available assets in this release: {', '.join(asset_names) if asset_names else 'none'}\n"
+                )
+            else:
+                error_msg += (
+                    "This release has no assets attached.\n"
+                )
+            
+            error_msg += (
+                "\nThis could mean:\n"
+                "  1. The database file hasn't been uploaded to this release yet\n"
+                "  2. The database file is available in a different release\n"
+                "  3. The database needs to be built from source\n\n"
+                "Alternatives:\n"
+                "  1. Check other releases for a database file:\n"
+                "     from internacia import list_releases\n"
+                "     releases = list_releases()\n"
+                "     # Look for releases with has_database=True\n"
+                "  2. Build the database locally:\n"
+                "     - Clone the internacia-db repository\n"
+                "     - Run: python3 scripts/builder.py build --formats duckdb\n"
+                "     - Set INTERNACIA_DB_PATH to point to the built database\n"
+                "  3. Use the source data directly from the repository"
+            )
+            
+            logger.error(error_msg)
+            raise VersionError(error_msg)
 
         return {
             "version": data.get("tag_name", version or "latest"),
@@ -154,6 +242,26 @@ def get_database_info(version: Optional[str] = None) -> dict:
             "published_at": data.get("published_at"),
         }
 
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            # Already handled above, but catch here for safety
+            error_msg = (
+                f"Release not found for {GITHUB_REPO}"
+                + (f" (version: {version})" if version else "") + ".\n"
+                "This could mean:\n"
+                "  1. The repository doesn't exist or has been renamed\n"
+                "  2. The specified version doesn't exist\n"
+                "  3. The repository has no releases yet\n"
+                "  4. The repository is private and requires authentication\n\n"
+                "Alternative: You can build the database locally by:\n"
+                "  1. Cloning the internacia-db repository\n"
+                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
+                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
+            )
+            logger.error(error_msg)
+            raise DownloadError(error_msg) from e
+        logger.error("Failed to fetch database info: %s", str(e))
+        raise DownloadError(f"Failed to fetch database info: {str(e)}") from e
     except requests.exceptions.RequestException as e:
         logger.error("Failed to fetch database info: %s", str(e))
         raise DownloadError(f"Failed to fetch database info: {str(e)}") from e
@@ -308,6 +416,51 @@ def download_database(
     except Exception as e:
         logger.error("Unexpected error during download: %s", str(e))
         raise DownloadError(f"Unexpected error during download: {str(e)}") from e
+
+
+def list_releases() -> list:
+    """
+    List all available releases and their database file status.
+
+    Returns:
+        List of dictionaries with release information:
+        - tag_name: str, release tag
+        - published_at: str, publication date
+        - has_database: bool, whether release has a .duckdb file
+        - asset_names: list, names of all assets in the release
+
+    Raises:
+        DownloadError: If unable to fetch releases
+    """
+    try:
+        logger.debug("Fetching releases from: %s", GITHUB_RELEASES_URL)
+        response = requests.get(
+            GITHUB_RELEASES_URL,
+            timeout=10,
+            headers={"Accept": "application/vnd.github.v3+json"},
+        )
+        response.raise_for_status()
+
+        releases_data = response.json()
+        releases = []
+
+        for release in releases_data:
+            assets = release.get("assets", [])
+            asset_names = [asset.get("name", "") for asset in assets]
+            has_database = any(name.endswith(".duckdb") for name in asset_names)
+
+            releases.append({
+                "tag_name": release.get("tag_name", ""),
+                "published_at": release.get("published_at", ""),
+                "has_database": has_database,
+                "asset_names": asset_names,
+            })
+
+        return releases
+
+    except requests.exceptions.RequestException as e:
+        logger.error("Failed to fetch releases: %s", str(e))
+        raise DownloadError(f"Failed to fetch releases: {str(e)}") from e
 
 
 def check_for_updates() -> dict:

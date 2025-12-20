@@ -51,7 +51,7 @@ if limit is not None:
 
 **Issue**: A hardcoded absolute path is included in the codebase:
 ```python
-Path("/Users/ibegtin/workspace/commondataio/internacia-db/data/datasets/internacia.duckdb")
+Path("/Users/ibegtin/workspace/datenoio/internacia-db/data/datasets/internacia.duckdb")
 ```
 
 **Recommendation**: Remove hardcoded paths. Use environment variables or configuration files instead.

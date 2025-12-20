@@ -34,6 +34,7 @@ from internacia.downloader import (
     download_database,
     get_latest_version,
     check_for_updates,
+    list_releases,
     get_cache_dir,
     get_cached_database_path,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "download_database",
     "get_latest_version",
     "check_for_updates",
+    "list_releases",
     "get_cache_dir",
     "get_cached_database_path",
 ]

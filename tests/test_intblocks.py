@@ -158,7 +158,7 @@ class TestIntblocksClientGetByMember:
 
         assert result == [sample_block_data]
         call_args = mock_db_manager.execute_query_dict.call_args
-        assert "member.id = ?" in call_args[0][0]
+        assert "unnest.id = ?" in call_args[0][0]
         assert call_args[0][1] == ("US",)
 
     def test_get_by_member_case_insensitive(self, mock_db_manager, sample_block_data):

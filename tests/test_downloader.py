@@ -12,6 +12,7 @@ from internacia.downloader import (
     get_database_info,
     download_database,
     check_for_updates,
+    list_releases,
 )
 from internacia.exceptions import DownloadError, VersionError
 
@@ -125,10 +126,20 @@ class TestGetLatestVersion:
     def test_get_latest_version_http_error(self):
         """Test HTTP error handling."""
         mock_response = Mock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found")
+        mock_response.status_code = 404
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found", response=mock_response)
 
         with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(DownloadError):
+            with pytest.raises(DownloadError, match="Repository or release not found"):
+                get_latest_version()
+    
+    def test_get_latest_version_404_error(self):
+        """Test 404 error handling with helpful message."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+
+        with patch("internacia.downloader.requests.get", return_value=mock_response):
+            with pytest.raises(DownloadError, match="Repository or release not found"):
                 get_latest_version()
 
 
@@ -190,7 +201,7 @@ class TestGetDatabaseInfo:
         mock_response.raise_for_status = Mock()
 
         with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(VersionError, match="No database file found"):
+            with pytest.raises(VersionError, match="No database file \\(.duckdb\\) found"):
                 get_database_info()
 
     def test_get_database_info_network_error(self):
@@ -198,6 +209,24 @@ class TestGetDatabaseInfo:
         with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
             with pytest.raises(DownloadError):
                 get_database_info()
+    
+    def test_get_database_info_404_error(self):
+        """Test 404 error handling with helpful message."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+
+        with patch("internacia.downloader.requests.get", return_value=mock_response):
+            with pytest.raises(DownloadError, match="Release not found"):
+                get_database_info()
+    
+    def test_get_database_info_404_error_with_version(self):
+        """Test 404 error handling with specific version."""
+        mock_response = Mock()
+        mock_response.status_code = 404
+
+        with patch("internacia.downloader.requests.get", return_value=mock_response):
+            with pytest.raises(DownloadError, match="Release not found.*version: v1.0.0"):
+                get_database_info(version="v1.0.0")
 
 
 class TestDownloadDatabase:
@@ -498,3 +527,43 @@ class TestCheckForUpdates:
         with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
             with pytest.raises(DownloadError):
                 check_for_updates()
+
+
+class TestListReleases:
+    """Test list_releases function."""
+
+    def test_list_releases_success(self):
+        """Test successful release listing."""
+        mock_response = Mock()
+        mock_response.json.return_value = [
+            {
+                "tag_name": "v1.0.0",
+                "published_at": "2024-01-01T00:00:00Z",
+                "assets": [
+                    {
+                        "name": "internacia.duckdb",
+                        "size": 1024,
+                    }
+                ],
+            },
+            {
+                "tag_name": "v0.9.0",
+                "published_at": "2023-12-01T00:00:00Z",
+                "assets": [],
+            },
+        ]
+        mock_response.raise_for_status = Mock()
+
+        with patch("internacia.downloader.requests.get", return_value=mock_response):
+            result = list_releases()
+            assert len(result) == 2
+            assert result[0]["tag_name"] == "v1.0.0"
+            assert result[0]["has_database"] is True
+            assert result[1]["tag_name"] == "v0.9.0"
+            assert result[1]["has_database"] is False
+
+    def test_list_releases_network_error(self):
+        """Test network error during release listing."""
+        with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
+            with pytest.raises(DownloadError):
+                list_releases()
