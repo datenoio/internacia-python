@@ -486,41 +486,34 @@ pip install -e ".[dev]"
 
 ### Running Tests
 
-The SDK includes a comprehensive test suite with 104+ tests covering all public APIs, error handling, validation, and edge cases.
+The suite has two parts:
+
+- **Unit tests** (`tests/test_*.py`) mock the database and cover validation, error paths and the downloader.
+- **Integration tests** (`tests/integration/`) run every public method and every `examples/*.py` script against a real internacia-db release DuckDB file. They are skipped unless `INTERNACIA_TEST_DB_PATH` is set, and they fail in CI if it is missing.
 
 ```bash
-# Run all tests
+# Unit tests only
 pytest
 
-# Run with verbose output
-pytest -v
+# Download the pinned release database (version and SHA-256 are in .github/workflows/ci.yml)
+python scripts/fetch_test_db.py --version 3.0.0 \
+  --sha256 02c33d6822432ef60bce19b81e33b180221f6d6504c3e163f0e14f866254e01d \
+  --output .test-data/internacia.duckdb
 
-# Run specific test file
-pytest tests/test_countries.py
+# Unit and integration tests
+INTERNACIA_TEST_DB_PATH=.test-data/internacia.duckdb INTERNACIA_TEST_DB_VERSION=3.0.0 pytest
 
-# Run with coverage report
+# With coverage report
 pytest --cov=internacia --cov-report=html
 ```
 
-**Test Coverage:**
-- ✅ All public methods (100% coverage)
-- ✅ Error handling and exception scenarios
-- ✅ Input validation and edge cases
-- ✅ Database connection management
-- ✅ Configuration and environment handling
-
-See [TEST_COVERAGE_ANALYSIS.md](TEST_COVERAGE_ANALYSIS.md) for detailed coverage information.
+CI runs the full suite on Python 3.11, 3.12 and 3.13 with both the minimum supported duckdb (1.5.4) and the newest allowed one.
 
 ### Code Formatting
 
 ```bash
-# Format code
-black internacia/
-
-# Lint code
-ruff check internacia/
-
-# Type checking
+black internacia/ tests/ examples/ scripts/
+ruff check internacia/ tests/ examples/ scripts/
 mypy internacia/
 ```
 
