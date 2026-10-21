@@ -20,8 +20,8 @@ print("\n--- Basic Fuzzy Search ---\n")
 print("1. Search for 'United States':")
 results = client.search.fuzzy("United States", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -30,8 +30,8 @@ for result in results:
 print("\n2. Search for 'EU':")
 results = client.search.fuzzy("EU", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -59,8 +59,8 @@ print("\n--- Multi-Language Search ---\n")
 print("5. Search in Russian (Европа):")
 results = client.search.fuzzy("Европа", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -69,8 +69,8 @@ for result in results:
 print("\n6. Search in Chinese (欧盟):")
 results = client.search.fuzzy("欧盟", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -79,8 +79,8 @@ for result in results:
 print("\n7. Search for French acronym 'UE':")
 results = client.search.fuzzy("UE", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -92,8 +92,8 @@ print("8. Search for partial match 'Euro':")
 results = client.search.fuzzy("Euro", limit=10)
 print(f"   Found {len(results)} results")
 for result in results[:5]:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
@@ -104,11 +104,10 @@ print("\n--- Code Search ---\n")
 print("9. Search by country code 'FR':")
 results = client.search.fuzzy("FR", limit=5)
 for result in results:
-    result_type = result.get('type', 'unknown')
-    if result_type == 'country':
+    result_type = result.get("type", "unknown")
+    if result_type == "country":
         print(f"   Country: {result['code']} - {result['name']}")
     else:
         print(f"   Block: {result['id']} - {result['name']}")
 
 print("\n" + "=" * 60)
-

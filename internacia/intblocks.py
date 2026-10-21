@@ -1,7 +1,8 @@
 """International blocks data access module."""
 
 import logging
-from typing import Optional, List
+from typing import cast
+
 from internacia.database import DatabaseManager
 from internacia.exceptions import ValidationError
 from internacia.models import Intblock
@@ -21,7 +22,7 @@ class IntblocksClient:
         """
         self._db = db_manager
 
-    def get_by_id(self, block_id: str) -> Optional[Intblock]:
+    def get_by_id(self, block_id: str) -> Intblock | None:
         """
         Get an international block by its ID.
 
@@ -37,15 +38,15 @@ class IntblocksClient:
         """
         logger.debug("Querying block by ID: %s", block_id)
         query = "SELECT * FROM intblocks WHERE id = ?"
-        results = self._db.execute_query_dict(query, (block_id.upper(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (block_id.upper(),)))
 
         if results:
-            logger.debug("Found block: %s", results[0].get('name'))
+            logger.debug("Found block: %s", results[0].get("name"))
             return results[0]
         logger.debug("Block not found for ID: %s", block_id)
         return None
 
-    def get_all(self, limit: Optional[int] = None) -> List[Intblock]:
+    def get_all(self, limit: int | None = None) -> list[Intblock]:
         """
         Get all international blocks.
 
@@ -62,11 +63,11 @@ class IntblocksClient:
             if not isinstance(limit, int) or limit <= 0:
                 raise ValueError("limit must be a positive integer")
             query = "SELECT * FROM intblocks LIMIT ?"
-            return self._db.execute_query_dict(query, (limit,))
+            return cast(list[Intblock], self._db.execute_query_dict(query, (limit,)))
         query = "SELECT * FROM intblocks"
-        return self._db.execute_query_dict(query)
+        return cast(list[Intblock], self._db.execute_query_dict(query))
 
-    def get_by_blocktype(self, blocktype: str) -> List[Intblock]:
+    def get_by_blocktype(self, blocktype: str) -> list[Intblock]:
         """
         Get blocks by type.
 
@@ -80,10 +81,10 @@ class IntblocksClient:
             SELECT * FROM intblocks
             WHERE LIST_CONTAINS(blocktype, ?)
         """
-        results = self._db.execute_query_dict(query, (blocktype.lower(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (blocktype.lower(),)))
         return results
 
-    def get_by_status(self, status: str) -> List[Intblock]:
+    def get_by_status(self, status: str) -> list[Intblock]:
         """
         Get blocks by status.
 
@@ -94,10 +95,10 @@ class IntblocksClient:
             List of block dictionaries
         """
         query = "SELECT * FROM intblocks WHERE status = ?"
-        results = self._db.execute_query_dict(query, (status.lower(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (status.lower(),)))
         return results
 
-    def get_by_geographic_scope(self, scope: str) -> List[Intblock]:
+    def get_by_geographic_scope(self, scope: str) -> list[Intblock]:
         """
         Get blocks by geographic scope.
 
@@ -108,10 +109,10 @@ class IntblocksClient:
             List of block dictionaries
         """
         query = "SELECT * FROM intblocks WHERE geographic_scope = ?"
-        results = self._db.execute_query_dict(query, (scope.lower(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (scope.lower(),)))
         return results
 
-    def get_by_member(self, country_code: str) -> List[Intblock]:
+    def get_by_member(self, country_code: str) -> list[Intblock]:
         """
         Get blocks that include a specific country as a member.
 
@@ -127,10 +128,10 @@ class IntblocksClient:
                 SELECT 1 FROM UNNEST(i.includes) AS t(member) WHERE member.id = ?
             )
         """
-        results = self._db.execute_query_dict(query, (country_code.upper(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (country_code.upper(),)))
         return results
 
-    def get_by_acronym(self, acronym: str) -> List[Intblock]:
+    def get_by_acronym(self, acronym: str) -> list[Intblock]:
         """
         Get blocks by acronym.
 
@@ -146,10 +147,10 @@ class IntblocksClient:
                 SELECT 1 FROM UNNEST(i.acronyms) AS t(acr) WHERE UPPER(acr.value) = ?
             )
         """
-        results = self._db.execute_query_dict(query, (acronym.upper(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (acronym.upper(),)))
         return results
 
-    def get_by_tag(self, tag: str) -> List[Intblock]:
+    def get_by_tag(self, tag: str) -> list[Intblock]:
         """
         Get blocks by tag.
 
@@ -163,10 +164,10 @@ class IntblocksClient:
             SELECT * FROM intblocks
             WHERE LIST_CONTAINS(tags, ?)
         """
-        results = self._db.execute_query_dict(query, (tag.lower(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (tag.lower(),)))
         return results
 
-    def get_by_topic(self, topic_key: str) -> List[Intblock]:
+    def get_by_topic(self, topic_key: str) -> list[Intblock]:
         """
         Get blocks by topic key.
 
@@ -182,10 +183,10 @@ class IntblocksClient:
                 SELECT 1 FROM UNNEST(i.topics) AS t(topic) WHERE topic.key = ?
             )
         """
-        results = self._db.execute_query_dict(query, (topic_key.lower(),))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (topic_key.lower(),)))
         return results
 
-    def get_by_founded_year(self, year: int) -> List[Intblock]:
+    def get_by_founded_year(self, year: int) -> list[Intblock]:
         """
         Get blocks founded in a specific year.
 
@@ -206,7 +207,7 @@ class IntblocksClient:
             SELECT * FROM intblocks
             WHERE founded LIKE ?
         """
-        results = self._db.execute_query_dict(query, (f"{year}%",))
+        results = cast(list[Intblock], self._db.execute_query_dict(query, (f"{year}%",)))
         return results
 
     def count(self) -> int:
@@ -218,4 +219,4 @@ class IntblocksClient:
         """
         query = "SELECT COUNT(*) as count FROM intblocks"
         result = self._db.execute_query_dict(query)
-        return result[0]["count"] if result else 0
+        return int(result[0]["count"]) if result else 0

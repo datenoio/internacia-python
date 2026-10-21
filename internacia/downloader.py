@@ -4,9 +4,9 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Optional
 
 import requests
+
 from internacia.config import Config
 from internacia.exceptions import DownloadError, VersionError
 
@@ -45,7 +45,7 @@ def get_cache_dir() -> Path:
     return cache_dir
 
 
-def get_cached_database_path(version: Optional[str] = None) -> Path:
+def get_cached_database_path(version: str | None = None) -> Path:
     """
     Get the path to the cached database file.
 
@@ -105,7 +105,7 @@ def get_latest_version() -> str:
         data = response.json()
         version = data.get("tag_name")
 
-        if not version:
+        if not isinstance(version, str) or not version:
             raise VersionError("No version tag found in latest release")
 
         logger.info("Latest version: %s", version)
@@ -137,7 +137,7 @@ def get_latest_version() -> str:
         raise VersionError(f"Invalid release response format: {e}") from e
 
 
-def get_database_info(version: Optional[str] = None) -> dict:
+def get_database_info(version: str | None = None) -> dict:
     """
     Get database metadata for a specific version.
 
@@ -170,7 +170,8 @@ def get_database_info(version: Optional[str] = None) -> dict:
         if response.status_code == 404:
             error_msg = (
                 f"Release not found for {GITHUB_REPO}"
-                + (f" (version: {version})" if version else "") + ".\n"
+                + (f" (version: {version})" if version else "")
+                + ".\n"
                 "This could mean:\n"
                 "  1. The repository doesn't exist or has been renamed\n"
                 "  2. The specified version doesn't exist\n"
@@ -200,18 +201,13 @@ def get_database_info(version: Optional[str] = None) -> dict:
             release_tag = data.get("tag_name", version or "latest")
             asset_names = [asset.get("name", "") for asset in assets] if assets else []
 
-            error_msg = (
-                f"No database file (.duckdb) found in release {release_tag}.\n"
-            )
+            error_msg = f"No database file (.duckdb) found in release {release_tag}.\n"
 
             if assets:
-                error_msg += (
-                    f"Available assets in this release: {', '.join(asset_names) if asset_names else 'none'}\n"
-                )
+                available = ", ".join(asset_names) if asset_names else "none"
+                error_msg += f"Available assets in this release: {available}\n"
             else:
-                error_msg += (
-                    "This release has no assets attached.\n"
-                )
+                error_msg += "This release has no assets attached.\n"
 
             error_msg += (
                 "\nThis could mean:\n"
@@ -247,7 +243,8 @@ def get_database_info(version: Optional[str] = None) -> dict:
             # Already handled above, but catch here for safety
             error_msg = (
                 f"Release not found for {GITHUB_REPO}"
-                + (f" (version: {version})" if version else "") + ".\n"
+                + (f" (version: {version})" if version else "")
+                + ".\n"
                 "This could mean:\n"
                 "  1. The repository doesn't exist or has been renamed\n"
                 "  2. The specified version doesn't exist\n"
@@ -294,6 +291,7 @@ def _download_file(url: str, destination: Path, show_progress: bool = True) -> N
         if show_progress:
             try:
                 import tqdm  # pylint: disable=import-outside-toplevel
+
                 use_tqdm = True
             except ImportError:
                 pass
@@ -304,13 +302,17 @@ def _download_file(url: str, destination: Path, show_progress: bool = True) -> N
         if use_tqdm and total_size > 0:
             # tqdm is imported conditionally above
             import tqdm  # pylint: disable=import-outside-toplevel
-            with open(destination, "wb") as f, tqdm.tqdm(
-                total=total_size,
-                unit="B",
-                unit_scale=True,
-                unit_divisor=1024,
-                desc="Downloading",
-            ) as pbar:
+
+            with (
+                open(destination, "wb") as f,
+                tqdm.tqdm(
+                    total=total_size,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc="Downloading",
+                ) as pbar,
+            ):
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
@@ -337,15 +339,13 @@ def _download_file(url: str, destination: Path, show_progress: bool = True) -> N
         if destination.exists():
             destination.unlink()
         raise DownloadError(f"Download failed: {str(e)}") from e
-    except IOError as e:
+    except OSError as e:
         logger.error("Failed to write file: %s", str(e))
         raise DownloadError(f"Failed to write file: {str(e)}") from e
 
 
 def download_database(
-    version: Optional[str] = None,
-    force: bool = False,
-    show_progress: bool = True
+    version: str | None = None, force: bool = False, show_progress: bool = True
 ) -> Path:
     """
     Download the database from GitHub releases.
@@ -449,12 +449,14 @@ def list_releases() -> list:
             asset_names = [asset.get("name", "") for asset in assets]
             has_database = any(name.endswith(".duckdb") for name in asset_names)
 
-            releases.append({
-                "tag_name": release.get("tag_name", ""),
-                "published_at": release.get("published_at", ""),
-                "has_database": has_database,
-                "asset_names": asset_names,
-            })
+            releases.append(
+                {
+                    "tag_name": release.get("tag_name", ""),
+                    "published_at": release.get("published_at", ""),
+                    "has_database": has_database,
+                    "asset_names": asset_names,
+                }
+            )
 
         return releases
 

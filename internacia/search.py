@@ -1,7 +1,7 @@
 """Search functionality with fuzzy matching support."""
 
 import logging
-from typing import Any, Dict, List, Set, Tuple, cast
+from typing import Any, cast
 
 from internacia.database import DatabaseManager
 from internacia.exceptions import ValidationError
@@ -27,8 +27,8 @@ class SearchClient:
         query: str,
         limit: int = 10,
         search_countries: bool = True,
-        search_intblocks: bool = True
-    ) -> List[SearchResult]:
+        search_intblocks: bool = True,
+    ) -> list[SearchResult]:
         """
         Perform fuzzy search across countries and international blocks.
 
@@ -65,38 +65,56 @@ class SearchClient:
         if not isinstance(search_countries, bool) or not isinstance(search_intblocks, bool):
             raise ValidationError("search_countries and search_intblocks must be boolean")
 
-        logger.debug("Fuzzy search: query='%s', limit=%s, countries=%s, blocks=%s",
-                     query, limit, search_countries, search_intblocks)
+        logger.debug(
+            "Fuzzy search: query='%s', limit=%s, countries=%s, blocks=%s",
+            query,
+            limit,
+            search_countries,
+            search_intblocks,
+        )
         query_upper = query.upper()
         query_lower = query.lower()
         pattern = f"%{query_upper}%"
-        results: List[Dict[str, Any]] = []
+        results: list[dict[str, Any]] = []
 
         if search_countries:
-            results.extend(self._db.execute_query_dict(
-                "SELECT *, 'country' as type FROM countries WHERE code = ? LIMIT ?",
-                (query_upper, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                "SELECT *, 'country' as type FROM countries WHERE iso3code = ? LIMIT ?",
-                (query_upper, limit)
-            ))
+            results.extend(
+                self._db.execute_query_dict(
+                    "SELECT *, 'country' as type FROM countries WHERE code = ? LIMIT ?",
+                    (query_upper, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    "SELECT *, 'country' as type FROM countries WHERE iso3code = ? LIMIT ?",
+                    (query_upper, limit),
+                )
+            )
             if query.isdigit():
-                results.extend(self._db.execute_query_dict(
-                    "SELECT *, 'country' as type FROM countries WHERE numeric_code = ? LIMIT ?",
-                    (query, limit)
-                ))
-            results.extend(self._db.execute_query_dict(
-                "SELECT *, 'country' as type FROM countries WHERE UPPER(name) LIKE ? LIMIT ?",
-                (pattern, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                ("SELECT *, 'country' as type FROM countries "
-                 "WHERE UPPER(official_name) LIKE ? LIMIT ?"),
-                (pattern, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                """
+                results.extend(
+                    self._db.execute_query_dict(
+                        "SELECT *, 'country' as type FROM countries WHERE numeric_code = ? LIMIT ?",
+                        (query, limit),
+                    )
+                )
+            results.extend(
+                self._db.execute_query_dict(
+                    "SELECT *, 'country' as type FROM countries WHERE UPPER(name) LIKE ? LIMIT ?",
+                    (pattern, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    (
+                        "SELECT *, 'country' as type FROM countries "
+                        "WHERE UPPER(official_name) LIKE ? LIMIT ?"
+                    ),
+                    (pattern, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    """
                 SELECT c.*, 'country' as type
                 FROM countries c
                 WHERE EXISTS (
@@ -105,20 +123,26 @@ class SearchClient:
                 )
                 LIMIT ?
                 """,
-                (pattern, pattern, limit)
-            ))
+                    (pattern, pattern, limit),
+                )
+            )
 
         if search_intblocks:
-            results.extend(self._db.execute_query_dict(
-                "SELECT *, 'intblock' as type FROM intblocks WHERE id = ? LIMIT ?",
-                (query_upper, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                "SELECT *, 'intblock' as type FROM intblocks WHERE UPPER(name) LIKE ? LIMIT ?",
-                (pattern, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                """
+            results.extend(
+                self._db.execute_query_dict(
+                    "SELECT *, 'intblock' as type FROM intblocks WHERE id = ? LIMIT ?",
+                    (query_upper, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    "SELECT *, 'intblock' as type FROM intblocks WHERE UPPER(name) LIKE ? LIMIT ?",
+                    (pattern, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    """
                 SELECT i.*, 'intblock' as type
                 FROM intblocks i
                 WHERE EXISTS (
@@ -127,10 +151,12 @@ class SearchClient:
                 )
                 LIMIT ?
                 """,
-                (pattern, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                """
+                    (pattern, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    """
                 SELECT i.*, 'intblock' as type
                 FROM intblocks i
                 WHERE EXISTS (
@@ -139,32 +165,35 @@ class SearchClient:
                 )
                 LIMIT ?
                 """,
-                (pattern, limit)
-            ))
-            results.extend(self._db.execute_query_dict(
-                """
+                    (pattern, limit),
+                )
+            )
+            results.extend(
+                self._db.execute_query_dict(
+                    """
                 SELECT *, 'intblock' as type
                 FROM intblocks
                 WHERE LIST_CONTAINS(tags, ?)
                 LIMIT ?
                 """,
-                (query_lower, limit)
-            ))
+                    (query_lower, limit),
+                )
+            )
 
-        seen: Set[Tuple[str, Any]] = set()
-        unique_results: List[Dict[str, Any]] = []
+        seen: set[tuple[str, Any]] = set()
+        unique_results: list[dict[str, Any]] = []
         for item in results:
-            if item.get('type') == 'country':
-                key = ('country', item.get('code'))
+            if item.get("type") == "country":
+                key = ("country", item.get("code"))
             else:
-                key = ('intblock', item.get('id'))
+                key = ("intblock", item.get("id"))
             if key not in seen:
                 seen.add(key)
                 unique_results.append(item)
 
-        def sort_key(item: Dict[str, Any]) -> Tuple[int, int]:
-            name = str(item.get('name') or '').lower()
-            code_or_id = str(item.get('code') or item.get('id') or '').lower()
+        def sort_key(item: dict[str, Any]) -> tuple[int, int]:
+            name = str(item.get("name") or "").lower()
+            code_or_id = str(item.get("code") or item.get("id") or "").lower()
 
             if code_or_id == query_lower:
                 return (0, 0)
@@ -174,15 +203,11 @@ class SearchClient:
 
         unique_results.sort(key=sort_key)
 
-        final_results = cast(List[SearchResult], unique_results[:limit])
+        final_results = cast(list[SearchResult], unique_results[:limit])
         logger.debug("Fuzzy search returned %s results", len(final_results))
         return final_results
 
-    def search_countries(
-        self,
-        query: str,
-        limit: int = 10
-    ) -> List[SearchResult]:
+    def search_countries(self, query: str, limit: int = 10) -> list[SearchResult]:
         """
         Search only countries.
 
@@ -194,13 +219,9 @@ class SearchClient:
             List of matching country dictionaries
         """
         results = self.fuzzy(query, limit=limit, search_countries=True, search_intblocks=False)
-        return [r for r in results if r.get('type') == 'country']
+        return [r for r in results if r.get("type") == "country"]
 
-    def search_intblocks(
-        self,
-        query: str,
-        limit: int = 10
-    ) -> List[SearchResult]:
+    def search_intblocks(self, query: str, limit: int = 10) -> list[SearchResult]:
         """
         Search only international blocks.
 
@@ -212,4 +233,4 @@ class SearchClient:
             List of matching block dictionaries
         """
         results = self.fuzzy(query, limit=limit, search_countries=False, search_intblocks=True)
-        return [r for r in results if r.get('type') == 'intblock']
+        return [r for r in results if r.get("type") == "intblock"]

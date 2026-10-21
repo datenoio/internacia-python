@@ -32,8 +32,8 @@ for language, query in test_queries:
     print(f"{language} ('{query}'):")
     results = client.search.fuzzy(query, limit=3)
     for result in results:
-        result_type = result.get('type', 'unknown')
-        if result_type == 'country':
+        result_type = result.get("type", "unknown")
+        if result_type == "country":
             print(f"  - Country: {result['code']} - {result['name']}")
         else:
             print(f"  - Block: {result['id']} - {result['name']}")
@@ -54,8 +54,8 @@ for language, query in acronym_queries:
     print(f"{language} acronym '{query}':")
     results = client.search.fuzzy(query, limit=3)
     for result in results:
-        result_type = result.get('type', 'unknown')
-        if result_type == 'country':
+        result_type = result.get("type", "unknown")
+        if result_type == "country":
             print(f"  - Country: {result['code']} - {result['name']}")
         else:
             print(f"  - Block: {result['id']} - {result['name']}")
@@ -94,8 +94,8 @@ for language, query in partial_queries:
     results = client.search.fuzzy(query, limit=5)
     print(f"  Found {len(results)} results")
     for result in results[:3]:
-        result_type = result.get('type', 'unknown')
-        if result_type == 'country':
+        result_type = result.get("type", "unknown")
+        if result_type == "country":
             print(f"  - Country: {result['code']} - {result['name']}")
         else:
             print(f"  - Block: {result['id']} - {result['name']}")
@@ -105,4 +105,3 @@ print("=" * 60)
 print("\nNote: The actual results may vary depending on the data available")
 print("in the internacia-db dataset. Some translations may not be present")
 print("for all entities.")
-

@@ -2,12 +2,12 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
-from internacia.database import DatabaseManager
+
+from internacia.config import Config
 from internacia.countries import CountriesClient
+from internacia.database import DatabaseManager
 from internacia.intblocks import IntblocksClient
 from internacia.search import SearchClient
-from internacia.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +28,8 @@ class InternaciaClient:
 
     def __init__(
         self,
-        db_path: Optional[Path] = None,
-        data_dir: Optional[Path] = None  # pylint: disable=unused-argument
+        db_path: Path | None = None,
+        data_dir: Path | None = None,  # pylint: disable=unused-argument
     ):
         """
         Initialize the Internacia client.
@@ -67,9 +67,7 @@ class InternaciaClient:
         else:
             db_path = Path(db_path)
             if not db_path.exists():
-                raise FileNotFoundError(
-                    f"Database file not found at specified path: {db_path}"
-                )
+                raise FileNotFoundError(f"Database file not found at specified path: {db_path}")
 
         logger.info("Initializing InternaciaClient with database: %s", db_path)
         self._db_manager = DatabaseManager(db_path)

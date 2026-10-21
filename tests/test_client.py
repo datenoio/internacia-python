@@ -67,10 +67,10 @@ def test_client_attributes(mock_db_path):
     """Test that client has all expected attributes."""
     client = InternaciaClient(db_path=mock_db_path)
 
-    assert hasattr(client, '_db_manager')
-    assert hasattr(client, 'countries')
-    assert hasattr(client, 'intblocks')
-    assert hasattr(client, 'search')
+    assert hasattr(client, "_db_manager")
+    assert hasattr(client, "countries")
+    assert hasattr(client, "intblocks")
+    assert hasattr(client, "search")
 
     # Test that attributes are the correct types
     assert isinstance(client.countries, CountriesClient)

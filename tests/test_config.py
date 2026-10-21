@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 from unittest.mock import patch
+
 from internacia.config import Config
 
 
@@ -26,9 +27,9 @@ class TestConfigGetDbPath:
         """Test with default path when it exists."""
         monkeypatch.delenv("INTERNACIA_DB_PATH", raising=False)
 
-        with patch('internacia.config.Path.exists', return_value=True):
-            with patch('internacia.config.Path.__init__', return_value=None):
-                with patch('internacia.config.Path.parent') as mock_parent:
+        with patch("internacia.config.Path.exists", return_value=True):
+            with patch("internacia.config.Path.__init__", return_value=None):
+                with patch("internacia.config.Path.parent") as mock_parent:
                     mock_parent.__truediv__ = lambda self, other: Path(f"/default/path/{other}")
                     result = Config.get_db_path()
                     # The exact path depends on the file location, but should not be None
@@ -38,7 +39,7 @@ class TestConfigGetDbPath:
         """Test when no path is found."""
         monkeypatch.delenv("INTERNACIA_DB_PATH", raising=False)
 
-        with patch('internacia.config.Path.exists', return_value=False):
+        with patch("internacia.config.Path.exists", return_value=False):
             result = Config.get_db_path()
             assert result is None
 

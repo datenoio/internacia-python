@@ -1,9 +1,8 @@
 """Configuration management for internacia SDK."""
 
-import os
 import logging
+import os
 from pathlib import Path
-from typing import Optional
 
 
 class Config:
@@ -21,7 +20,7 @@ class Config:
     DEFAULT_LOG_LEVEL = logging.WARNING
 
     @classmethod
-    def get_db_path(cls, explicit_path: Optional[Path] = None) -> Optional[Path]:
+    def get_db_path(cls, explicit_path: Path | None = None) -> Path | None:
         """
         Get database path from various sources.
 
@@ -53,7 +52,10 @@ class Config:
 
         # Try cached database (lazy import to avoid circular dependency)
         try:
-            from internacia.downloader import get_cached_database_path, get_cache_dir  # pylint: disable=import-outside-toplevel
+            from internacia.downloader import (
+                get_cache_dir,
+                get_cached_database_path,
+            )  # pylint: disable=import-outside-toplevel
 
             # First check unversioned cache path
             cached_path = get_cached_database_path()
@@ -111,9 +113,7 @@ class Config:
         # Only configure if not already configured
         if not logger.handlers:
             handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
+            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
             handler.setFormatter(formatter)
             logger.addHandler(handler)
             logger.setLevel(cls.get_log_level())

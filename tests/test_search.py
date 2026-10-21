@@ -1,8 +1,9 @@
 """Tests for SearchClient functionality."""
 
 import pytest
-from internacia.search import SearchClient
+
 from internacia.exceptions import ValidationError
+from internacia.search import SearchClient
 
 
 class TestSearchClientFuzzy:
@@ -14,7 +15,9 @@ class TestSearchClientFuzzy:
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
 
-        result = client.fuzzy("United States", limit=10, search_countries=True, search_intblocks=False)
+        result = client.fuzzy(
+            "United States", limit=10, search_countries=True, search_intblocks=False
+        )
 
         assert len(result) > 0
         assert all(r.get("type") == "country" for r in result)
@@ -36,6 +39,7 @@ class TestSearchClientFuzzy:
         block_result = {"id": "EU", "name": "European Union", "type": "intblock"}
         # Simulate multiple calls returning different results
         call_count = [0]
+
         def side_effect(*args, **kwargs):  # pylint: disable=unused-argument
             call_count[0] += 1
             if call_count[0] <= 3:
@@ -64,7 +68,12 @@ class TestSearchClientFuzzy:
 
     def test_fuzzy_search_by_numeric_code(self, mock_db_manager):
         """Test fuzzy search by numeric code."""
-        country_result = {"code": "US", "name": "United States", "numeric_code": "840", "type": "country"}
+        country_result = {
+            "code": "US",
+            "name": "United States",
+            "numeric_code": "840",
+            "type": "country",
+        }
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
 
@@ -102,7 +111,9 @@ class TestSearchClientFuzzy:
     def test_fuzzy_search_respects_limit(self, mock_db_manager):
         """Test that fuzzy search respects limit."""
         # Return many results
-        many_results = [{"code": f"US{i}", "name": f"Country {i}", "type": "country"} for i in range(20)]
+        many_results = [
+            {"code": f"US{i}", "name": f"Country {i}", "type": "country"} for i in range(20)
+        ]
         mock_db_manager.execute_query_dict.return_value = many_results
         client = SearchClient(mock_db_manager)
 
@@ -185,57 +196,67 @@ class TestFuzzySearchComprehensive:
         """Test fuzzy search by country code (exact match)."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "code = ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("US", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["code"] == "US"
         assert result[0]["type"] == "country"
 
     def test_fuzzy_search_by_iso3_code(self, mock_db_manager):
         """Test fuzzy search by ISO3 code."""
-        country_result = {"code": "US", "iso3code": "USA", "name": "United States", "type": "country"}
+        country_result = {
+            "code": "US",
+            "iso3code": "USA",
+            "name": "United States",
+            "type": "country",
+        }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "iso3code = ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("USA", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["iso3code"] == "USA"
 
     def test_fuzzy_search_by_numeric_code_exact(self, mock_db_manager):
         """Test fuzzy search by numeric code (exact match)."""
-        country_result = {"code": "US", "numeric_code": "840", "name": "United States", "type": "country"}
+        country_result = {
+            "code": "US",
+            "numeric_code": "840",
+            "name": "United States",
+            "type": "country",
+        }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "numeric_code = ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("840", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["numeric_code"] == "840"
 
@@ -243,18 +264,18 @@ class TestFuzzySearchComprehensive:
         """Test fuzzy search by country name (partial match)."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(name) LIKE ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=10)
-        
+
         assert len(result) > 0
         assert "United" in result[0]["name"]
 
@@ -264,21 +285,21 @@ class TestFuzzySearchComprehensive:
             "code": "US",
             "name": "United States",
             "official_name": "United States of America",
-            "type": "country"
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(official_name) LIKE ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("America", limit=10)
-        
+
         assert len(result) > 0
         assert "America" in result[0]["official_name"]
 
@@ -289,23 +310,23 @@ class TestFuzzySearchComprehensive:
             "name": "France",
             "native_names": {
                 "fra": {"common": "France", "official": "République française"},
-                "deu": {"common": "Frankreich", "official": "Französische Republik"}
+                "deu": {"common": "Frankreich", "official": "Französische Republik"},
             },
-            "type": "country"
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "native_names" in query and "common" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("Frankreich", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["code"] == "FR"
 
@@ -314,24 +335,22 @@ class TestFuzzySearchComprehensive:
         country_result = {
             "code": "FR",
             "name": "France",
-            "native_names": {
-                "fra": {"common": "France", "official": "République française"}
-            },
-            "type": "country"
+            "native_names": {"fra": {"common": "France", "official": "République française"}},
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "native_names" in query and "official" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("République", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["code"] == "FR"
 
@@ -339,18 +358,18 @@ class TestFuzzySearchComprehensive:
         """Test fuzzy search by block ID (exact match)."""
         block_result = {"id": "EU", "name": "European Union", "type": "intblock"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "intblocks" in query and "id = ?" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("EU", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["id"] == "EU"
         assert result[0]["type"] == "intblock"
@@ -359,18 +378,18 @@ class TestFuzzySearchComprehensive:
         """Test fuzzy search by block name (partial match)."""
         block_result = {"id": "EU", "name": "European Union", "type": "intblock"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "intblocks" in query and "UPPER(name) LIKE ?" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("European", limit=10)
-        
+
         assert len(result) > 0
         assert "European" in result[0]["name"]
 
@@ -379,25 +398,22 @@ class TestFuzzySearchComprehensive:
         block_result = {
             "id": "EU",
             "name": "European Union",
-            "other_names": [
-                {"id": "ru", "name": "Европейский союз"},
-                {"id": "zh", "name": "欧盟"}
-            ],
-            "type": "intblock"
+            "other_names": [{"id": "ru", "name": "Европейский союз"}, {"id": "zh", "name": "欧盟"}],
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "other_names" in query and "UNNEST" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("Европейский", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["id"] == "EU"
 
@@ -406,25 +422,22 @@ class TestFuzzySearchComprehensive:
         block_result = {
             "id": "EU",
             "name": "European Union",
-            "acronyms": [
-                {"lang": "en", "value": "EU"},
-                {"lang": "fr", "value": "UE"}
-            ],
-            "type": "intblock"
+            "acronyms": [{"lang": "en", "value": "EU"}, {"lang": "fr", "value": "UE"}],
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "acronyms" in query and "UNNEST" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("UE", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["id"] == "EU"
 
@@ -434,21 +447,21 @@ class TestFuzzySearchComprehensive:
             "id": "EU",
             "name": "European Union",
             "tags": ["trade", "economic", "political"],
-            "type": "intblock"
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "LIST_CONTAINS(tags" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("trade", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["id"] == "EU"
         assert "trade" in result[0]["tags"]
@@ -457,41 +470,41 @@ class TestFuzzySearchComprehensive:
         """Test that country name search is case-insensitive."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(name) LIKE ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         # Test lowercase
         result1 = client.fuzzy("united", limit=10)
         # Test uppercase
         result2 = client.fuzzy("UNITED", limit=10)
         # Test mixed case
         result3 = client.fuzzy("UnItEd", limit=10)
-        
+
         assert len(result1) > 0 or len(result2) > 0 or len(result3) > 0
 
     def test_fuzzy_search_case_insensitive_block_name(self, mock_db_manager):
         """Test that block name search is case-insensitive."""
         block_result = {"id": "EU", "name": "European Union", "type": "intblock"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "intblocks" in query and "UPPER(name) LIKE ?" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("european", limit=10)
-        
+
         assert len(result) > 0
 
     def test_fuzzy_search_partial_match_starts_with(self, mock_db_manager):
@@ -499,9 +512,9 @@ class TestFuzzySearchComprehensive:
         country_result = {"code": "US", "name": "United States", "type": "country"}
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["name"].startswith("United")
 
@@ -510,9 +523,9 @@ class TestFuzzySearchComprehensive:
         country_result = {"code": "US", "name": "United States", "type": "country"}
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("States", limit=10)
-        
+
         assert len(result) > 0
         assert "States" in result[0]["name"]
 
@@ -521,8 +534,9 @@ class TestFuzzySearchComprehensive:
         exact_match = {"code": "US", "name": "US", "type": "country"}
         partial_match1 = {"code": "UA", "name": "United Arab Emirates", "type": "country"}
         partial_match2 = {"code": "GB", "name": "United Kingdom", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "code = ?" in query:
@@ -530,12 +544,12 @@ class TestFuzzySearchComprehensive:
             elif "UPPER(name) LIKE ?" in query:
                 return [partial_match1, partial_match2]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("US", limit=10)
-        
+
         # Exact match should be first
         assert len(result) > 0
         assert result[0]["code"] == "US"
@@ -544,19 +558,20 @@ class TestFuzzySearchComprehensive:
         """Test that names starting with query are prioritized."""
         starts_with = {"code": "US", "name": "United States", "type": "country"}
         contains = {"code": "AU", "name": "Australia", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(name) LIKE ?" in query:
                 return [starts_with, contains]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=10)
-        
+
         # Name starting with query should come first
         assert len(result) > 0
         assert result[0]["name"].startswith("United")
@@ -566,24 +581,22 @@ class TestFuzzySearchComprehensive:
         country_result = {
             "code": "RU",
             "name": "Russia",
-            "native_names": {
-                "rus": {"common": "Россия", "official": "Российская Федерация"}
-            },
-            "type": "country"
+            "native_names": {"rus": {"common": "Россия", "official": "Российская Федерация"}},
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "native_names" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("Россия", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["code"] == "RU"
 
@@ -593,21 +606,21 @@ class TestFuzzySearchComprehensive:
             "id": "EU",
             "name": "European Union",
             "other_names": [{"id": "zh", "name": "欧盟"}],
-            "type": "intblock"
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "other_names" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("欧盟", limit=10)
-        
+
         assert len(result) > 0
         assert result[0]["id"] == "EU"
 
@@ -617,21 +630,21 @@ class TestFuzzySearchComprehensive:
             "code": "FR",
             "name": "France",
             "official_name": "République française",
-            "type": "country"
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "official_name" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("française", limit=10)
-        
+
         assert len(result) > 0
 
     def test_fuzzy_search_whitespace_handling(self, mock_db_manager):
@@ -639,10 +652,10 @@ class TestFuzzySearchComprehensive:
         country_result = {"code": "US", "name": "United States", "type": "country"}
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
-        
+
         # Query with leading/trailing whitespace should be trimmed
         result = client.fuzzy("  United States  ", limit=10)
-        
+
         # Should not raise error and should find results
         assert isinstance(result, list)
 
@@ -654,28 +667,28 @@ class TestFuzzySearchComprehensive:
             "native_names": {
                 "deu": {"common": "Deutschland", "official": "Bundesrepublik Deutschland"},
                 "fra": {"common": "Allemagne", "official": "République fédérale d'Allemagne"},
-                "spa": {"common": "Alemania", "official": "República Federal de Alemania"}
+                "spa": {"common": "Alemania", "official": "República Federal de Alemania"},
             },
-            "type": "country"
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "native_names" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         # Test German
         result1 = client.fuzzy("Deutschland", limit=10)
         # Test French
         result2 = client.fuzzy("Allemagne", limit=10)
         # Test Spanish
         result3 = client.fuzzy("Alemania", limit=10)
-        
+
         assert len(result1) > 0 or len(result2) > 0 or len(result3) > 0
 
     def test_fuzzy_search_multiple_languages_other_names(self, mock_db_manager):
@@ -687,36 +700,41 @@ class TestFuzzySearchComprehensive:
                 {"id": "en", "name": "European Union"},
                 {"id": "ru", "name": "Европейский союз"},
                 {"id": "zh", "name": "欧盟"},
-                {"id": "fr", "name": "Union européenne"}
+                {"id": "fr", "name": "Union européenne"},
             ],
-            "type": "intblock"
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "other_names" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         # Test Russian
         result1 = client.fuzzy("Европейский", limit=10)
         # Test Chinese
         result2 = client.fuzzy("欧盟", limit=10)
         # Test French
         result3 = client.fuzzy("européenne", limit=10)
-        
+
         assert len(result1) > 0 or len(result2) > 0 or len(result3) > 0
 
     def test_fuzzy_search_combined_countries_and_blocks(self, mock_db_manager):
         """Test search that returns both countries and blocks."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
-        block_result = {"id": "USMCA", "name": "United States-Mexico-Canada Agreement", "type": "intblock"}
-        
+        block_result = {
+            "id": "USMCA",
+            "name": "United States-Mexico-Canada Agreement",
+            "type": "intblock",
+        }
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "countries" in query:
@@ -724,12 +742,12 @@ class TestFuzzySearchComprehensive:
             elif "intblocks" in query:
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United States", limit=10)
-        
+
         assert len(result) > 0
         country_types = [r for r in result if r.get("type") == "country"]
         block_types = [r for r in result if r.get("type") == "intblock"]
@@ -738,37 +756,44 @@ class TestFuzzySearchComprehensive:
     def test_fuzzy_search_duplicate_removal_same_type(self, mock_db_manager):
         """Test that duplicates of the same type are removed."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             # Return same country from multiple queries
             return [country_result]
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("US", limit=10)
-        
+
         # Should only have one instance of US
         us_results = [r for r in result if r.get("code") == "US"]
         assert len(us_results) <= 1
 
     def test_fuzzy_search_duplicate_removal_different_queries(self, mock_db_manager):
         """Test that same country found via different queries is deduplicated."""
-        country_result = {"code": "US", "name": "United States", "iso3code": "USA", "type": "country"}
-        
+        country_result = {
+            "code": "US",
+            "name": "United States",
+            "iso3code": "USA",
+            "type": "country",
+        }
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             # Return same country from code, iso3, and name queries
             return [country_result]
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("US", limit=10)
-        
+
         # Should only have one instance
         assert len(result) == 1
         assert result[0]["code"] == "US"
@@ -776,14 +801,13 @@ class TestFuzzySearchComprehensive:
     def test_fuzzy_search_limit_enforcement(self, mock_db_manager):
         """Test that limit is strictly enforced."""
         many_results = [
-            {"code": f"C{i:02d}", "name": f"Country {i}", "type": "country"}
-            for i in range(50)
+            {"code": f"C{i:02d}", "name": f"Country {i}", "type": "country"} for i in range(50)
         ]
         mock_db_manager.execute_query_dict.return_value = many_results
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("Country", limit=5)
-        
+
         assert len(result) == 5
 
     def test_fuzzy_search_limit_one(self, mock_db_manager):
@@ -791,55 +815,55 @@ class TestFuzzySearchComprehensive:
         country_result = {"code": "US", "name": "United States", "type": "country"}
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=1)
-        
+
         assert len(result) <= 1
 
     def test_fuzzy_search_empty_query_raises_error(self, mock_db_manager):
         """Test that empty query raises ValidationError."""
         client = SearchClient(mock_db_manager)
-        
+
         with pytest.raises(ValidationError, match="query must be a non-empty string"):
             client.fuzzy("", limit=10)
-        
+
         with pytest.raises(ValidationError, match="query must be a non-empty string"):
             client.fuzzy("   ", limit=10)
 
     def test_fuzzy_search_invalid_limit_raises_error(self, mock_db_manager):
         """Test that invalid limit raises ValidationError."""
         client = SearchClient(mock_db_manager)
-        
+
         with pytest.raises(ValidationError, match="limit must be a positive integer"):
             client.fuzzy("test", limit=0)
-        
+
         with pytest.raises(ValidationError, match="limit must be a positive integer"):
             client.fuzzy("test", limit=-1)
 
     def test_fuzzy_search_none_query_raises_error(self, mock_db_manager):
         """Test that None query raises ValidationError."""
         client = SearchClient(mock_db_manager)
-        
+
         with pytest.raises(ValidationError):
             client.fuzzy(None, limit=10)
 
     def test_fuzzy_search_non_string_query_raises_error(self, mock_db_manager):
         """Test that non-string query raises ValidationError."""
         client = SearchClient(mock_db_manager)
-        
+
         with pytest.raises(ValidationError):
             client.fuzzy(123, limit=10)
-        
+
         with pytest.raises(ValidationError):
             client.fuzzy([], limit=10)
 
     def test_fuzzy_search_non_integer_limit_raises_error(self, mock_db_manager):
         """Test that non-integer limit raises ValidationError."""
         client = SearchClient(mock_db_manager)
-        
+
         with pytest.raises(ValidationError):
             client.fuzzy("test", limit="10")
-        
+
         with pytest.raises(ValidationError):
             client.fuzzy("test", limit=10.5)
 
@@ -847,19 +871,19 @@ class TestFuzzySearchComprehensive:
         """Test that numeric code search is only performed for digit queries."""
         country_result = {"code": "US", "name": "United States", "type": "country"}
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             # Should not search numeric_code for non-digit query
             if "numeric_code" in query:
                 return []
             return [country_result]
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         client.fuzzy("US", limit=10)
-        
+
         # Verify numeric_code query was not made
         calls = [call[0][0] for call in mock_db_manager.execute_query_dict.call_args_list]
         numeric_calls = [c for c in calls if "numeric_code" in c]
@@ -867,20 +891,25 @@ class TestFuzzySearchComprehensive:
 
     def test_fuzzy_search_numeric_code_only_for_digits(self, mock_db_manager):
         """Test that numeric code search is performed for digit queries."""
-        country_result = {"code": "US", "numeric_code": "840", "name": "United States", "type": "country"}
+        country_result = {
+            "code": "US",
+            "numeric_code": "840",
+            "name": "United States",
+            "type": "country",
+        }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "numeric_code = ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         client.fuzzy("840", limit=10)
-        
+
         # Verify numeric_code query was made
         calls = [call[0][0] for call in mock_db_manager.execute_query_dict.call_args_list]
         numeric_calls = [c for c in calls if "numeric_code" in c]
@@ -892,10 +921,10 @@ class TestFuzzySearchComprehensive:
             "id": "EU",
             "name": "European Union",
             "tags": ["trade", "economic"],
-            "type": "intblock"
+            "type": "intblock",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "LIST_CONTAINS(tags" in query:
@@ -903,20 +932,21 @@ class TestFuzzySearchComprehensive:
                 assert params[0] == "trade"
                 return [block_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("TRADE", limit=10)
-        
+
         assert len(result) > 0
 
     def test_fuzzy_search_result_ordering_exact_code_first(self, mock_db_manager):
         """Test that exact code matches come before name matches."""
         exact_code = {"code": "US", "name": "United States", "type": "country"}
         name_match = {"code": "UA", "name": "United Arab Emirates", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "code = ?" in query:
@@ -924,12 +954,12 @@ class TestFuzzySearchComprehensive:
             elif "UPPER(name) LIKE ?" in query:
                 return [name_match]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("US", limit=10)
-        
+
         # Exact code match should be first
         assert result[0]["code"] == "US"
 
@@ -937,19 +967,20 @@ class TestFuzzySearchComprehensive:
         """Test that shorter matching names come before longer ones."""
         short_name = {"code": "US", "name": "United States", "type": "country"}
         long_name = {"code": "UA", "name": "United Arab Emirates", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(name) LIKE ?" in query:
                 return [short_name, long_name]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=10)
-        
+
         # Shorter name should come first (if both start with query)
         assert len(result) > 0
         # Both should be present, but shorter should be prioritized
@@ -959,19 +990,20 @@ class TestFuzzySearchComprehensive:
         """Test search returning multiple blocks for same query."""
         block1 = {"id": "EU", "name": "European Union", "type": "intblock"}
         block2 = {"id": "EEA", "name": "European Economic Area", "type": "intblock"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "intblocks" in query and "UPPER(name) LIKE ?" in query:
                 return [block1, block2]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("European", limit=10, search_countries=False)
-        
+
         assert len(result) >= 2
         block_ids = [r["id"] for r in result]
         assert "EU" in block_ids
@@ -982,19 +1014,20 @@ class TestFuzzySearchComprehensive:
         country1 = {"code": "US", "name": "United States", "type": "country"}
         country2 = {"code": "UA", "name": "United Arab Emirates", "type": "country"}
         country3 = {"code": "GB", "name": "United Kingdom", "type": "country"}
-        
+
         call_count = [0]
+
         def side_effect(query, params):
             call_count[0] += 1
             if "countries" in query and "UPPER(name) LIKE ?" in query:
                 return [country1, country2, country3]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United", limit=10, search_intblocks=False)
-        
+
         assert len(result) >= 3
         codes = [r["code"] for r in result]
         assert "US" in codes
@@ -1007,21 +1040,21 @@ class TestFuzzySearchComprehensive:
             "code": "US",
             "name": "United States",
             "official_name": "United States of America",
-            "type": "country"
+            "type": "country",
         }
         call_count = [0]
-        
+
         def side_effect(query, params):
             call_count[0] += 1
             if "UPPER(name) LIKE ?" in query or "UPPER(official_name) LIKE ?" in query:
                 return [country_result]
             return []
-        
+
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("United States of", limit=10)
-        
+
         assert len(result) > 0
 
     def test_fuzzy_search_single_character_query(self, mock_db_manager):
@@ -1029,9 +1062,9 @@ class TestFuzzySearchComprehensive:
         country_result = {"code": "U", "name": "Utopia", "type": "country"}
         mock_db_manager.execute_query_dict.return_value = [country_result]
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("U", limit=10)
-        
+
         assert isinstance(result, list)
 
     def test_fuzzy_search_very_long_query(self, mock_db_manager):
@@ -1039,9 +1072,9 @@ class TestFuzzySearchComprehensive:
         long_query = "A" * 1000
         mock_db_manager.execute_query_dict.return_value = []
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy(long_query, limit=10)
-        
+
         # Should not raise error
         assert isinstance(result, list)
 
@@ -1049,7 +1082,7 @@ class TestFuzzySearchComprehensive:
         """Test that disabling both search types returns empty list."""
         mock_db_manager.execute_query_dict.return_value = []
         client = SearchClient(mock_db_manager)
-        
+
         result = client.fuzzy("test", limit=10, search_countries=False, search_intblocks=False)
-        
+
         assert result == []

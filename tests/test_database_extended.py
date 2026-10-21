@@ -14,7 +14,7 @@ class TestDatabaseManagerExecuteQuery:
     def test_execute_query_without_parameters(self, mock_db_path):
         """Test execute_query without parameters."""
         # Create a real DuckDB connection for this test
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.return_value.fetchall.return_value = [("US", "United States")]
             mock_duckdb.connect.return_value = mock_conn
@@ -28,7 +28,7 @@ class TestDatabaseManagerExecuteQuery:
 
     def test_execute_query_with_parameters(self, mock_db_path):
         """Test execute_query with parameters."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.return_value.fetchall.return_value = [("US",)]
             mock_duckdb.connect.return_value = mock_conn
@@ -37,11 +37,13 @@ class TestDatabaseManagerExecuteQuery:
             result = manager.execute_query("SELECT code FROM countries WHERE code = ?", ("US",))
 
             assert result == [("US",)]
-            mock_conn.execute.assert_called_once_with("SELECT code FROM countries WHERE code = ?", ("US",))
+            mock_conn.execute.assert_called_once_with(
+                "SELECT code FROM countries WHERE code = ?", ("US",)
+            )
 
     def test_execute_query_error_handling(self, mock_db_path):
         """Test execute_query error handling."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.side_effect = Exception("SQL syntax error")
             mock_duckdb.connect.return_value = mock_conn
@@ -60,7 +62,7 @@ class TestDatabaseManagerExecuteQueryDict:
 
     def test_execute_query_dict_without_parameters(self, mock_db_path):
         """Test execute_query_dict without parameters."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.return_value.description = [("code",), ("name",)]
             mock_conn.execute.return_value.fetchall.return_value = [("US", "United States")]
@@ -77,22 +79,26 @@ class TestDatabaseManagerExecuteQueryDict:
 
     def test_execute_query_dict_with_parameters(self, mock_db_path):
         """Test execute_query_dict with parameters."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.return_value.description = [("code",)]
             mock_conn.execute.return_value.fetchall.return_value = [("US",)]
             mock_duckdb.connect.return_value = mock_conn
 
             manager = DatabaseManager(mock_db_path)
-            result = manager.execute_query_dict("SELECT code FROM countries WHERE code = ?", ("US",))
+            result = manager.execute_query_dict(
+                "SELECT code FROM countries WHERE code = ?", ("US",)
+            )
 
             assert len(result) == 1
             assert result[0]["code"] == "US"
-            mock_conn.execute.assert_called_once_with("SELECT code FROM countries WHERE code = ?", ("US",))
+            mock_conn.execute.assert_called_once_with(
+                "SELECT code FROM countries WHERE code = ?", ("US",)
+            )
 
     def test_execute_query_dict_error_handling(self, mock_db_path):
         """Test execute_query_dict error handling."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.side_effect = Exception("SQL syntax error")
             mock_duckdb.connect.return_value = mock_conn
@@ -107,7 +113,7 @@ class TestDatabaseManagerExecuteQueryDict:
 
     def test_execute_query_dict_empty_result(self, mock_db_path):
         """Test execute_query_dict with empty result."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.return_value.description = [("code",)]
             mock_conn.execute.return_value.fetchall.return_value = []
@@ -124,7 +130,7 @@ class TestDatabaseManagerConnection:
 
     def test_get_connection_read_only(self, mock_db_path):
         """Test that connections are opened in read-only mode."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_duckdb.connect.return_value = mock_conn
 
@@ -137,7 +143,7 @@ class TestDatabaseManagerConnection:
 
     def test_get_connection_closes_on_exception(self, mock_db_path):
         """Test that connection is closed even if exception occurs."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_conn.execute.side_effect = Exception("Test error")
             mock_duckdb.connect.return_value = mock_conn
@@ -154,11 +160,11 @@ class TestDatabaseManagerConnection:
 
     def test_get_connection_handles_connection_failure(self, mock_db_path):
         """Test handling of connection failure."""
-        with patch('internacia.database.duckdb') as mock_duckdb:
+        with patch("internacia.database.duckdb") as mock_duckdb:
             mock_duckdb.connect.side_effect = Exception("Connection failed")
 
             manager = DatabaseManager(mock_db_path)
 
-            with pytest.raises(Exception):
+            with pytest.raises(Exception, match="Connection failed"):
                 with manager.get_connection():
                     pass
