@@ -593,6 +593,10 @@ This function searches across:
 **Returns:**
 - `List[SearchResult]`: List of matching records with a 'type' field indicating 'country' or 'intblock'
 
+Results are ranked: exact codes and block ids first, then names (or codes and ids) that start
+with the query, then other matches; ties go to shorter names. `%` and `_` in the query match
+literally.
+
 **Raises:**
 - `ValidationError`: If query is empty or limit is invalid
 

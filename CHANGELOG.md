@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   docstrings (OpenAI and plain JSON Schema formats), enum lists from the connected database, and
   `call_tool()` to execute tool calls. Replaces the hand-written `*_lookup.openai.json` files in
   internacia-db.
+- `internacia[mcp]` extra and the `internacia-mcp` command: an MCP stdio server with the same
+  tools as `internacia.tools` (`internacia.mcp_server.build_server()` to embed it).
 
 ### Changed
 - `download_database()` uses direct release download URLs (no GitHub API rate limit), resolves
@@ -44,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One read-only DuckDB connection per client (a cursor per query) instead of one connection per
   query.
 - The SDK no longer attaches logging handlers; `INTERNACIA_LOG_LEVEL` only sets the level.
+- `client.search` runs one ranked query per table instead of one query per matched field:
+  exact codes and ids first, then prefix matches, then other matches, shorter names first. `%`
+  and `_` in the query now match literally.
 
 ### Removed
 - The sibling `../internacia-db/data/datasets/internacia.duckdb` fallback and

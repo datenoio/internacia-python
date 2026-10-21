@@ -41,10 +41,17 @@ dev = [
     "types-requests",
     "types-tqdm",
     "pre-commit>=3.0.0",
+    "mcp>=2.3,<3",
 ]
 progress = [
     "tqdm>=4.64.0",
 ]
+mcp = [
+    "mcp>=2.3,<3",
+]
+
+[project.scripts]
+internacia-mcp = "internacia.mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/datenoio/internacia-python"

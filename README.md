@@ -32,6 +32,12 @@ For download progress bars, install with the `progress` extra:
 pip install internacia[progress]
 ```
 
+For the MCP server (`internacia-mcp`), install the `mcp` extra:
+
+```bash
+pip install internacia[mcp]
+```
+
 Or install from source:
 
 ```bash
@@ -160,6 +166,23 @@ result = call_tool(client, "intblock_lookup", '{"member_country": "FR", "scope_c
 
 `call_tool` accepts the arguments as a dict or as the JSON string LLM APIs return, and returns
 JSON-serializable data.
+
+### MCP server
+
+The same tools are available to MCP clients (Claude Desktop, Cursor, …) through a stdio server:
+
+```bash
+pip install internacia[mcp]
+internacia-mcp
+```
+
+```json
+{"mcpServers": {"internacia": {"command": "internacia-mcp"}}}
+```
+
+The server finds the database like the client does (`INTERNACIA_DB_PATH`,
+`INTERNACIA_DATA_VERSION` or the download cache); set them in the client's `env` block.
+`internacia.mcp_server.build_server(client)` returns the server for embedding.
 
 ## Quick Start
 
@@ -314,6 +337,10 @@ The `fuzzy()` method supports the following parameters:
 - `limit`: Maximum number of results to return (default: 10)
 - `search_countries`: Whether to search countries (default: True)
 - `search_intblocks`: Whether to search international blocks (default: True)
+
+Results are ranked: exact codes and block ids first, then names (or codes and ids) that start
+with the query, then other matches; ties go to shorter names. Each table is searched with one
+query. `%` and `_` in the query match literally.
 
 ### Custom Database Path
 
