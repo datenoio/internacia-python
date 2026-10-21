@@ -409,7 +409,7 @@ from internacia import download_database
 db_path = download_database()
 
 # Download specific version
-db_path = download_database(version="v1.0.0")
+db_path = download_database(version="v3.0.0")
 
 # Force re-download
 db_path = download_database(force=True)
@@ -456,7 +456,7 @@ print(f"Cache: {cache_dir}")
 
 # Get cached database path
 latest_path = get_cached_database_path()
-version_path = get_cached_database_path(version="v1.0.0")
+version_path = get_cached_database_path(version="v3.0.0")
 ```
 
 ---

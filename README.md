@@ -12,6 +12,13 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 - ⚡ **Fast**: Leverages DuckDB for high-performance queries
 - ✅ **Well-Tested**: Comprehensive test suite with 100% coverage of all public APIs
 
+## Compatibility
+
+| internacia (SDK) | internacia-db data | duckdb | Python |
+|---|---|---|---|
+| 0.3.x | 3.x (tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
+| 0.2.0 | 1.x–2.x; broken on 3.x | `>=0.9.0` | `>=3.8` (declared) |
+
 ## Installation
 
 ```bash
@@ -27,7 +34,7 @@ pip install internacia[progress]
 Or install from source:
 
 ```bash
-git clone https://github.com/commondataio/internacia-python.git
+git clone https://github.com/datenoio/internacia-python.git
 cd internacia-python
 pip install -e .
 ```
@@ -57,7 +64,7 @@ from internacia import download_database
 db_path = download_database()
 
 # Download a specific version
-db_path = download_database(version="v1.0.0")
+db_path = download_database(version="v3.0.0")
 
 # Force re-download even if already cached
 db_path = download_database(force=True)
@@ -69,7 +76,7 @@ db_path = download_database(show_progress=True)
 db_path = download_database(show_progress=False)
 ```
 
-The database will be cached in `~/.internacia/internacia.duckdb` by default. You can customize the cache location using the `INTERNACIA_CACHE_DIR` environment variable:
+The database will be cached in `~/.internacia/<version>/internacia.duckdb` (for example `~/.internacia/v3.0.0/internacia.duckdb`) by default. You can customize the cache location using the `INTERNACIA_CACHE_DIR` environment variable:
 
 ```bash
 export INTERNACIA_CACHE_DIR="/path/to/cache"
@@ -479,7 +486,7 @@ See the `examples/` directory for more detailed usage examples:
 ### Setup
 
 ```bash
-git clone https://github.com/commondataio/internacia-python.git
+git clone https://github.com/datenoio/internacia-python.git
 cd internacia-python
 pip install -e ".[dev]"
 ```
@@ -626,7 +633,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## Related Projects
 
 - [internacia-db](https://github.com/datenoio/internacia-db): The data repository
-- [internacia-api](https://github.com/commondataio/internacia-api): REST API for internacia-db
+- [internacia-api](https://github.com/datenoio/internacia-api): REST API for internacia-db
 
 ## Changelog
 

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - Unreleased
+
+Supports internacia-db 3.x data. Tested against internacia-db 3.0.0.
+
+### Packaging
+
+- `requires-python>=3.11`; Python 3.8–3.10 are no longer supported (3.8 never worked).
+- `pyproject.toml` is the only build configuration; `setup.py` and `requirements.txt` are removed. The version is read from `internacia/version.py`.
+- Project URLs point to `github.com/datenoio`.
+- Releases are published from a `v*` tag by `.github/workflows/release.yml` through PyPI Trusted Publishing.
+- Removed the VS Code workspace file from the package directory and stopped tracking `dev/docs/`.
+
 ### Fixed
 
 - Compatibility with internacia-db v3: every public method now works against the v3.0.0 DuckDB on duckdb 1.5.4 and 2.x.
