@@ -107,7 +107,9 @@ class DatabaseManager:
             parameters: Query parameters (optional)
 
         Returns:
-            List of result rows (dictionaries with column names as keys)
+            List of result rows (dictionaries with column names as keys).
+            Values are plain Python types: LIST columns become ``list``,
+            STRUCT and MAP columns become ``dict`` and SQL NULL becomes ``None``.
 
         Raises:
             DatabaseError: If the query execution fails
@@ -117,10 +119,11 @@ class DatabaseManager:
             logger.debug("Executing query: %s", query_preview)
             with self.get_connection() as conn:
                 if parameters:
-                    result = conn.execute(query, parameters).fetchdf()
+                    cursor = conn.execute(query, parameters)
                 else:
-                    result = conn.execute(query).fetchdf()
-                records = result.to_dict('records')
+                    cursor = conn.execute(query)
+                columns = [col[0] for col in cursor.description]
+                records = [dict(zip(columns, row)) for row in cursor.fetchall()]
                 logger.debug("Query returned %s rows", len(records))
                 return records
         except Exception as e:

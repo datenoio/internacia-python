@@ -276,9 +276,9 @@ print(block["status"])    # "formal"
 for blocktype in block.get("blocktype", []):
     print(blocktype)  # "economic", "political"
 
-# Translations (multi-language)
-for translation in block.get("translations", []):
-    print(f"{translation['lang']}: {translation['name']}")
+# Names in other languages
+for other in block.get("other_names") or []:
+    print(f"{other['id']}: {other['name']}")
 
 # Acronyms (multi-language)
 for acronym in block.get("acronyms", []):
@@ -372,7 +372,7 @@ results = client.search.fuzzy("Deutschland")  # Germany
 
 The fuzzy search:
 - **Prioritizes exact matches**: Country codes and block IDs are matched first
-- **Supports partial matches**: Searches within names, translations, and acronyms
+- **Supports partial matches**: Searches within names, names in other languages, and acronyms
 - **Case-insensitive**: Matching is not case-sensitive
 - **Removes duplicates**: Automatically deduplicates results
 - **Sorts by relevance**: Exact matches first, then by name length

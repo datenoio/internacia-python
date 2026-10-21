@@ -34,7 +34,7 @@ for continent, count in continent_counts.most_common():
 print("\n2. Analyze countries by income level:")
 income_levels = {}
 for country in all_countries:
-    income = country.get('incomeLevel', {})
+    income = country.get('incomeLevel') or {}
     if income:
         level = income.get('value', 'Unknown')
         income_levels[level] = income_levels.get(level, 0) + 1
@@ -46,7 +46,7 @@ for level, count in sorted(income_levels.items(), key=lambda x: x[1], reverse=Tr
 # Find countries with most languages
 print("\n3. Countries with most languages:")
 countries_with_langs = [
-    (c['code'], c['name'], len(c.get('languages', [])))
+    (c['code'], c['name'], len(c.get('languages') or []))
     for c in all_countries
     if c.get('languages')
 ]

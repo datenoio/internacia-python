@@ -374,14 +374,14 @@ class TestFuzzySearchComprehensive:
         assert len(result) > 0
         assert "European" in result[0]["name"]
 
-    def test_fuzzy_search_by_block_translations(self, mock_db_manager):
-        """Test fuzzy search by block translations."""
+    def test_fuzzy_search_by_block_other_names(self, mock_db_manager):
+        """Test fuzzy search by block names in other languages."""
         block_result = {
             "id": "EU",
             "name": "European Union",
-            "translations": [
-                {"lang": "ru", "name": "Европейский союз"},
-                {"lang": "zh", "name": "欧盟"}
+            "other_names": [
+                {"id": "ru", "name": "Европейский союз"},
+                {"id": "zh", "name": "欧盟"}
             ],
             "type": "intblock"
         }
@@ -389,7 +389,7 @@ class TestFuzzySearchComprehensive:
         
         def side_effect(query, params):
             call_count[0] += 1
-            if "translations" in query and "UNNEST" in query:
+            if "other_names" in query and "UNNEST" in query:
                 return [block_result]
             return []
         
@@ -592,14 +592,14 @@ class TestFuzzySearchComprehensive:
         block_result = {
             "id": "EU",
             "name": "European Union",
-            "translations": [{"lang": "zh", "name": "欧盟"}],
+            "other_names": [{"id": "zh", "name": "欧盟"}],
             "type": "intblock"
         }
         call_count = [0]
         
         def side_effect(query, params):
             call_count[0] += 1
-            if "translations" in query:
+            if "other_names" in query:
                 return [block_result]
             return []
         
@@ -678,16 +678,16 @@ class TestFuzzySearchComprehensive:
         
         assert len(result1) > 0 or len(result2) > 0 or len(result3) > 0
 
-    def test_fuzzy_search_multiple_languages_translations(self, mock_db_manager):
-        """Test search across multiple languages in block translations."""
+    def test_fuzzy_search_multiple_languages_other_names(self, mock_db_manager):
+        """Test search across multiple languages in block other_names."""
         block_result = {
             "id": "EU",
             "name": "European Union",
-            "translations": [
-                {"lang": "en", "name": "European Union"},
-                {"lang": "ru", "name": "Европейский союз"},
-                {"lang": "zh", "name": "欧盟"},
-                {"lang": "fr", "name": "Union européenne"}
+            "other_names": [
+                {"id": "en", "name": "European Union"},
+                {"id": "ru", "name": "Европейский союз"},
+                {"id": "zh", "name": "欧盟"},
+                {"id": "fr", "name": "Union européenne"}
             ],
             "type": "intblock"
         }
@@ -695,7 +695,7 @@ class TestFuzzySearchComprehensive:
         
         def side_effect(query, params):
             call_count[0] += 1
-            if "translations" in query:
+            if "other_names" in query:
                 return [block_result]
             return []
         

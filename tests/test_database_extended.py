@@ -61,10 +61,9 @@ class TestDatabaseManagerExecuteQueryDict:
     def test_execute_query_dict_without_parameters(self, mock_db_path):
         """Test execute_query_dict without parameters."""
         with patch('internacia.database.duckdb') as mock_duckdb:
-            import pandas as pd
             mock_conn = MagicMock()
-            mock_df = pd.DataFrame({"code": ["US"], "name": ["United States"]})
-            mock_conn.execute.return_value.fetchdf.return_value = mock_df
+            mock_conn.execute.return_value.description = [("code",), ("name",)]
+            mock_conn.execute.return_value.fetchall.return_value = [("US", "United States")]
             mock_duckdb.connect.return_value = mock_conn
 
             manager = DatabaseManager(mock_db_path)
@@ -79,10 +78,9 @@ class TestDatabaseManagerExecuteQueryDict:
     def test_execute_query_dict_with_parameters(self, mock_db_path):
         """Test execute_query_dict with parameters."""
         with patch('internacia.database.duckdb') as mock_duckdb:
-            import pandas as pd
             mock_conn = MagicMock()
-            mock_df = pd.DataFrame({"code": ["US"]})
-            mock_conn.execute.return_value.fetchdf.return_value = mock_df
+            mock_conn.execute.return_value.description = [("code",)]
+            mock_conn.execute.return_value.fetchall.return_value = [("US",)]
             mock_duckdb.connect.return_value = mock_conn
 
             manager = DatabaseManager(mock_db_path)
@@ -110,10 +108,9 @@ class TestDatabaseManagerExecuteQueryDict:
     def test_execute_query_dict_empty_result(self, mock_db_path):
         """Test execute_query_dict with empty result."""
         with patch('internacia.database.duckdb') as mock_duckdb:
-            import pandas as pd
             mock_conn = MagicMock()
-            mock_df = pd.DataFrame()
-            mock_conn.execute.return_value.fetchdf.return_value = mock_df
+            mock_conn.execute.return_value.description = [("code",)]
+            mock_conn.execute.return_value.fetchall.return_value = []
             mock_duckdb.connect.return_value = mock_conn
 
             manager = DatabaseManager(mock_db_path)

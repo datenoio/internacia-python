@@ -23,7 +23,7 @@ if country:
     print(f"   Code: {country['code']}")
     print(f"   Name: {country['name']}")
     print(f"   Official Name: {country.get('official_name', 'N/A')}")
-    print(f"   Capital: {country.get('capital_city', {}).get('name', 'N/A')}")
+    print(f"   Capital: {(country.get('capital_city') or {}).get('name', 'N/A')}")
 
 # Get country by ISO3 code
 print("\n2. Get country by ISO3 code:")
@@ -59,7 +59,7 @@ block = client.intblocks.get_by_id("EU")
 if block:
     print(f"   ID: {block['id']}")
     print(f"   Name: {block['name']}")
-    print(f"   Type: {', '.join(block.get('blocktype', []))}")
+    print(f"   Type: {', '.join(block.get('blocktype') or [])}")
     print(f"   Status: {block.get('status', 'N/A')}")
     print(f"   Members: {block.get('membership_count', 'N/A')}")
 

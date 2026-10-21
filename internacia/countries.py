@@ -201,9 +201,10 @@ class CountriesClient:
             List of country dictionaries
         """
         query = """
-            SELECT DISTINCT c.*
-            FROM countries c, UNNEST(c.currencies) AS curr
-            WHERE curr.code = ?
+            SELECT c.* FROM countries c
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(c.currencies) AS t(curr) WHERE curr.code = ?
+            )
         """
         results = self._db.execute_query_dict(query, (currency_code.upper(),))
         return results
@@ -219,9 +220,10 @@ class CountriesClient:
             List of country dictionaries
         """
         query = """
-            SELECT DISTINCT c.*
-            FROM countries c, UNNEST(c.languages) AS lang
-            WHERE lang.code = ?
+            SELECT c.* FROM countries c
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(c.languages) AS t(lang) WHERE lang.code = ?
+            )
         """
         results = self._db.execute_query_dict(query, (language_code.lower(),))
         return results

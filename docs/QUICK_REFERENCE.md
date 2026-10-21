@@ -215,8 +215,8 @@ types = block["blocktype"]
 tags = block["tags"]
 
 # Nested lists
-for translation in block["translations"]:
-    print(f"{translation['lang']}: {translation['name']}")
+for other in block["other_names"] or []:
+    print(f"{other['id']}: {other['name']}")
 
 for member in block["includes"]:
     print(f"{member['name']} ({member['id']})")

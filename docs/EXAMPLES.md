@@ -456,21 +456,19 @@ if country and country.get("native_names"):
         print(f"    Official: {official}")
 ```
 
-### Search Block Translations
+### Block Names in Other Languages
 
 ```python
 from internacia import InternaciaClient
 
 client = InternaciaClient()
 
-# Get a block and display translations
+# Get a block and display its names in other languages
 block = client.intblocks.get_by_id("EU")
-if block and block.get("translations"):
-    print(f"Translations for {block['name']}:")
-    for translation in block["translations"]:
-        lang = translation.get("lang", "")
-        name = translation.get("name", "")
-        print(f"  {lang}: {name}")
+if block and block.get("other_names"):
+    print(f"Other names for {block['name']}:")
+    for other in block["other_names"]:
+        print(f"  {other.get('id', '')}: {other.get('name', '')}")
 ```
 
 ---
