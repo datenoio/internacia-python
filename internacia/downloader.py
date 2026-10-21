@@ -83,7 +83,7 @@ def get_latest_version() -> str:
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
         )
-        
+
         # Handle 404 specifically with a helpful error message
         if response.status_code == 404:
             error_msg = (
@@ -99,7 +99,7 @@ def get_latest_version() -> str:
             )
             logger.error(error_msg)
             raise DownloadError(error_msg)
-        
+
         response.raise_for_status()
 
         data = response.json()
@@ -128,13 +128,13 @@ def get_latest_version() -> str:
             logger.error(error_msg)
             raise DownloadError(error_msg) from e
         logger.error("Failed to fetch latest version: %s", str(e))
-        raise DownloadError("Failed to fetch latest version: %s" % str(e)) from e
+        raise DownloadError(f"Failed to fetch latest version: {e}") from e
     except requests.exceptions.RequestException as e:
         logger.error("Failed to fetch latest version: %s", str(e))
-        raise DownloadError("Failed to fetch latest version: %s" % str(e)) from e
+        raise DownloadError(f"Failed to fetch latest version: {e}") from e
     except KeyError as e:
         logger.error("Invalid response format: %s", str(e))
-        raise VersionError("Invalid release response format: %s" % str(e)) from e
+        raise VersionError(f"Invalid release response format: {e}") from e
 
 
 def get_database_info(version: Optional[str] = None) -> dict:
@@ -165,7 +165,7 @@ def get_database_info(version: Optional[str] = None) -> dict:
             timeout=10,
             headers={"Accept": "application/vnd.github.v3+json"},
         )
-        
+
         # Handle 404 specifically with a helpful error message
         if response.status_code == 404:
             error_msg = (
@@ -183,7 +183,7 @@ def get_database_info(version: Optional[str] = None) -> dict:
             )
             logger.error(error_msg)
             raise DownloadError(error_msg)
-        
+
         response.raise_for_status()
 
         data = response.json()
@@ -199,11 +199,11 @@ def get_database_info(version: Optional[str] = None) -> dict:
         if not db_asset:
             release_tag = data.get("tag_name", version or "latest")
             asset_names = [asset.get("name", "") for asset in assets] if assets else []
-            
+
             error_msg = (
                 f"No database file (.duckdb) found in release {release_tag}.\n"
             )
-            
+
             if assets:
                 error_msg += (
                     f"Available assets in this release: {', '.join(asset_names) if asset_names else 'none'}\n"
@@ -212,7 +212,7 @@ def get_database_info(version: Optional[str] = None) -> dict:
                 error_msg += (
                     "This release has no assets attached.\n"
                 )
-            
+
             error_msg += (
                 "\nThis could mean:\n"
                 "  1. The database file hasn't been uploaded to this release yet\n"
@@ -229,7 +229,7 @@ def get_database_info(version: Optional[str] = None) -> dict:
                 "     - Set INTERNACIA_DB_PATH to point to the built database\n"
                 "  3. Use the source data directly from the repository"
             )
-            
+
             logger.error(error_msg)
             raise VersionError(error_msg)
 

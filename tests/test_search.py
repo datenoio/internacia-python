@@ -858,7 +858,7 @@ class TestFuzzySearchComprehensive:
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
         
-        result = client.fuzzy("US", limit=10)
+        client.fuzzy("US", limit=10)
         
         # Verify numeric_code query was not made
         calls = [call[0][0] for call in mock_db_manager.execute_query_dict.call_args_list]
@@ -879,7 +879,7 @@ class TestFuzzySearchComprehensive:
         mock_db_manager.execute_query_dict.side_effect = side_effect
         client = SearchClient(mock_db_manager)
         
-        result = client.fuzzy("840", limit=10)
+        client.fuzzy("840", limit=10)
         
         # Verify numeric_code query was made
         calls = [call[0][0] for call in mock_db_manager.execute_query_dict.call_args_list]

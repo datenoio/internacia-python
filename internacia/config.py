@@ -54,12 +54,12 @@ class Config:
         # Try cached database (lazy import to avoid circular dependency)
         try:
             from internacia.downloader import get_cached_database_path, get_cache_dir  # pylint: disable=import-outside-toplevel
-            
+
             # First check unversioned cache path
             cached_path = get_cached_database_path()
             if cached_path.exists():
                 return cached_path
-            
+
             # If not found, check versioned cache directories
             cache_dir = get_cache_dir()
             if cache_dir.exists():

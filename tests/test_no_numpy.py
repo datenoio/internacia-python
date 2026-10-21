@@ -1,6 +1,5 @@
 """Tests to verify no numpy.ndarray types are returned from any function."""
 
-import pytest
 from internacia.countries import CountriesClient
 from internacia.intblocks import IntblocksClient
 from internacia.search import SearchClient
