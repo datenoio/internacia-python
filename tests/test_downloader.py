@@ -6,12 +6,12 @@ import pytest
 import requests
 
 from internacia.downloader import (
+    check_for_updates,
+    download_database,
     get_cache_dir,
     get_cached_database_path,
-    get_latest_version,
     get_database_info,
-    download_database,
-    check_for_updates,
+    get_latest_version,
     list_releases,
 )
 from internacia.exceptions import DownloadError, VersionError
@@ -119,7 +119,10 @@ class TestGetLatestVersion:
 
     def test_get_latest_version_network_error(self):
         """Test network error handling."""
-        with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=requests.exceptions.RequestException("Network error"),
+        ):
             with pytest.raises(DownloadError, match="Failed to fetch latest version"):
                 get_latest_version()
 
@@ -127,12 +130,14 @@ class TestGetLatestVersion:
         """Test HTTP error handling."""
         mock_response = Mock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Not Found", response=mock_response)
+        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
+            "404 Not Found", response=mock_response
+        )
 
         with patch("internacia.downloader.requests.get", return_value=mock_response):
             with pytest.raises(DownloadError, match="Repository or release not found"):
                 get_latest_version()
-    
+
     def test_get_latest_version_404_error(self):
         """Test 404 error handling with helpful message."""
         mock_response = Mock()
@@ -206,10 +211,13 @@ class TestGetDatabaseInfo:
 
     def test_get_database_info_network_error(self):
         """Test network error handling."""
-        with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=requests.exceptions.RequestException("Network error"),
+        ):
             with pytest.raises(DownloadError):
                 get_database_info()
-    
+
     def test_get_database_info_404_error(self):
         """Test 404 error handling with helpful message."""
         mock_response = Mock()
@@ -218,7 +226,7 @@ class TestGetDatabaseInfo:
         with patch("internacia.downloader.requests.get", return_value=mock_response):
             with pytest.raises(DownloadError, match="Release not found"):
                 get_database_info()
-    
+
     def test_get_database_info_404_error_with_version(self):
         """Test 404 error handling with specific version."""
         mock_response = Mock()
@@ -273,6 +281,7 @@ class TestDownloadDatabase:
                 def write_temp_file(url, dest, **kwargs):
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_bytes(b"fake database content")
+
                 mock_download.side_effect = write_temp_file
                 result = download_database()
                 assert result.exists()
@@ -351,6 +360,7 @@ class TestDownloadDatabase:
                 def write_temp_file(url, dest, **kwargs):
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_bytes(b"new database content")
+
                 mock_download.side_effect = write_temp_file
                 result = download_database(force=True)
                 # Should have attempted download
@@ -389,6 +399,7 @@ class TestDownloadDatabase:
                 def write_temp_file(url, dest, **kwargs):
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     dest.write_bytes(b"database content")
+
                 mock_download.side_effect = write_temp_file
                 result = download_database(version="v1.0.0")
                 # Should use version-specific URL
@@ -524,7 +535,10 @@ class TestCheckForUpdates:
 
     def test_check_for_updates_network_error(self):
         """Test network error during update check."""
-        with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=requests.exceptions.RequestException("Network error"),
+        ):
             with pytest.raises(DownloadError):
                 check_for_updates()
 
@@ -564,6 +578,9 @@ class TestListReleases:
 
     def test_list_releases_network_error(self):
         """Test network error during release listing."""
-        with patch("internacia.downloader.requests.get", side_effect=requests.exceptions.RequestException("Network error")):
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=requests.exceptions.RequestException("Network error"),
+        ):
             with pytest.raises(DownloadError):
                 list_releases()

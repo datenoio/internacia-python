@@ -90,4 +90,3 @@ print(f"   Total countries: {client.countries.count()}")
 print(f"   Total blocks: {client.intblocks.count()}")
 
 print("\n" + "=" * 60)
-

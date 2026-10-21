@@ -1,7 +1,8 @@
 """Countries data access module."""
 
 import logging
-from typing import Optional, List
+from typing import cast
+
 from internacia.database import DatabaseManager
 from internacia.exceptions import ValidationError
 from internacia.models import Country
@@ -21,7 +22,7 @@ class CountriesClient:
         """
         self._db = db_manager
 
-    def get_by_code(self, code: str) -> Optional[Country]:
+    def get_by_code(self, code: str) -> Country | None:
         """
         Get a country by its ISO 3166-1 alpha-2 code.
 
@@ -43,15 +44,15 @@ class CountriesClient:
 
         logger.debug("Querying country by code: %s", code)
         query = "SELECT * FROM countries WHERE code = ?"
-        results = self._db.execute_query_dict(query, (code.upper(),))
+        results = cast(list[Country], self._db.execute_query_dict(query, (code.upper(),)))
 
         if results:
-            logger.debug("Found country: %s", results[0].get('name'))
+            logger.debug("Found country: %s", results[0].get("name"))
             return results[0]
         logger.debug("Country not found for code: %s", code)
         return None
 
-    def get_by_iso3(self, iso3code: str) -> Optional[Country]:
+    def get_by_iso3(self, iso3code: str) -> Country | None:
         """
         Get a country by its ISO 3166-1 alpha-3 code.
 
@@ -69,15 +70,15 @@ class CountriesClient:
 
         logger.debug("Querying country by ISO3 code: %s", iso3code)
         query = "SELECT * FROM countries WHERE iso3code = ?"
-        results = self._db.execute_query_dict(query, (iso3code.upper(),))
+        results = cast(list[Country], self._db.execute_query_dict(query, (iso3code.upper(),)))
 
         if results:
-            logger.debug("Found country: %s", results[0].get('name'))
+            logger.debug("Found country: %s", results[0].get("name"))
             return results[0]
         logger.debug("Country not found for ISO3 code: %s", iso3code)
         return None
 
-    def get_by_numeric_code(self, numeric_code: str) -> Optional[Country]:
+    def get_by_numeric_code(self, numeric_code: str) -> Country | None:
         """
         Get a country by its ISO 3166-1 numeric code.
 
@@ -90,21 +91,24 @@ class CountriesClient:
         Raises:
             ValidationError: If numeric_code is not a valid 3-digit string
         """
-        if (not isinstance(numeric_code, str) or len(numeric_code) != 3 or
-                not numeric_code.isdigit()):
+        if (
+            not isinstance(numeric_code, str)
+            or len(numeric_code) != 3
+            or not numeric_code.isdigit()
+        ):
             raise ValidationError("numeric_code must be a 3-digit string")
 
         logger.debug("Querying country by numeric code: %s", numeric_code)
         query = "SELECT * FROM countries WHERE numeric_code = ?"
-        results = self._db.execute_query_dict(query, (numeric_code,))
+        results = cast(list[Country], self._db.execute_query_dict(query, (numeric_code,)))
 
         if results:
-            logger.debug("Found country: %s", results[0].get('name'))
+            logger.debug("Found country: %s", results[0].get("name"))
             return results[0]
         logger.debug("Country not found for numeric code: %s", numeric_code)
         return None
 
-    def get_all(self, limit: Optional[int] = None) -> List[Country]:
+    def get_all(self, limit: int | None = None) -> list[Country]:
         """
         Get all countries.
 
@@ -121,11 +125,11 @@ class CountriesClient:
             if not isinstance(limit, int) or limit <= 0:
                 raise ValueError("limit must be a positive integer")
             query = "SELECT * FROM countries LIMIT ?"
-            return self._db.execute_query_dict(query, (limit,))
+            return cast(list[Country], self._db.execute_query_dict(query, (limit,)))
         query = "SELECT * FROM countries"
-        return self._db.execute_query_dict(query)
+        return cast(list[Country], self._db.execute_query_dict(query))
 
-    def get_by_region(self, region_id: str) -> List[Country]:
+    def get_by_region(self, region_id: str) -> list[Country]:
         """
         Get countries by World Bank region ID.
 
@@ -136,10 +140,10 @@ class CountriesClient:
             List of country dictionaries
         """
         query = "SELECT * FROM countries WHERE region.id = ?"
-        results = self._db.execute_query_dict(query, (region_id,))
+        results = cast(list[Country], self._db.execute_query_dict(query, (region_id,)))
         return results
 
-    def get_by_income_level(self, income_level_id: str) -> List[Country]:
+    def get_by_income_level(self, income_level_id: str) -> list[Country]:
         """
         Get countries by World Bank income level.
 
@@ -150,10 +154,10 @@ class CountriesClient:
             List of country dictionaries
         """
         query = "SELECT * FROM countries WHERE incomeLevel.id = ?"
-        results = self._db.execute_query_dict(query, (income_level_id,))
+        results = cast(list[Country], self._db.execute_query_dict(query, (income_level_id,)))
         return results
 
-    def get_un_members(self) -> List[Country]:
+    def get_un_members(self) -> list[Country]:
         """
         Get all UN member countries.
 
@@ -161,9 +165,9 @@ class CountriesClient:
             List of UN member country dictionaries
         """
         query = "SELECT * FROM countries WHERE un_member = true"
-        return self._db.execute_query_dict(query)
+        return cast(list[Country], self._db.execute_query_dict(query))
 
-    def get_independent(self) -> List[Country]:
+    def get_independent(self) -> list[Country]:
         """
         Get all independent countries.
 
@@ -171,9 +175,9 @@ class CountriesClient:
             List of independent country dictionaries
         """
         query = "SELECT * FROM countries WHERE independent = true"
-        return self._db.execute_query_dict(query)
+        return cast(list[Country], self._db.execute_query_dict(query))
 
-    def get_by_continent(self, continent: str) -> List[Country]:
+    def get_by_continent(self, continent: str) -> list[Country]:
         """
         Get countries by continent.
 
@@ -187,10 +191,10 @@ class CountriesClient:
             SELECT * FROM countries
             WHERE LIST_CONTAINS(continents, ?)
         """
-        results = self._db.execute_query_dict(query, (continent,))
+        results = cast(list[Country], self._db.execute_query_dict(query, (continent,)))
         return results
 
-    def get_by_currency(self, currency_code: str) -> List[Country]:
+    def get_by_currency(self, currency_code: str) -> list[Country]:
         """
         Get countries that use a specific currency.
 
@@ -206,10 +210,10 @@ class CountriesClient:
                 SELECT 1 FROM UNNEST(c.currencies) AS t(curr) WHERE curr.code = ?
             )
         """
-        results = self._db.execute_query_dict(query, (currency_code.upper(),))
+        results = cast(list[Country], self._db.execute_query_dict(query, (currency_code.upper(),)))
         return results
 
-    def get_by_language(self, language_code: str) -> List[Country]:
+    def get_by_language(self, language_code: str) -> list[Country]:
         """
         Get countries where a specific language is spoken.
 
@@ -225,7 +229,7 @@ class CountriesClient:
                 SELECT 1 FROM UNNEST(c.languages) AS t(lang) WHERE lang.code = ?
             )
         """
-        results = self._db.execute_query_dict(query, (language_code.lower(),))
+        results = cast(list[Country], self._db.execute_query_dict(query, (language_code.lower(),)))
         return results
 
     def count(self) -> int:
@@ -237,4 +241,4 @@ class CountriesClient:
         """
         query = "SELECT COUNT(*) as count FROM countries"
         result = self._db.execute_query_dict(query)
-        return result[0]["count"] if result else 0
+        return int(result[0]["count"]) if result else 0

@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Intblock.translations` and the `Translation` type. Use `other_names` and `OtherName`.
 
+### Testing
+
+- Integration tests (`tests/integration/`) run every public method and every example script against the internacia-db v3.0.0 release DuckDB, downloaded and SHA-256-verified by `scripts/fetch_test_db.py`.
+- CI matrix: Python 3.11–3.13 × duckdb 1.5.4 and newest `<3`, plus macOS and Windows. The Python 3.8–3.10 jobs are removed.
+- black, ruff and mypy pass; tool versions and the ruff rule set are pinned in `pyproject.toml` and `.pre-commit-config.yaml`.
+
 ## [0.2.0] - 2025-12-20
 
 Initial release of Internacia Python SDK

@@ -1,10 +1,11 @@
 """Tests for input validation."""
 
 import pytest
+
 from internacia.countries import CountriesClient
+from internacia.exceptions import ValidationError
 from internacia.intblocks import IntblocksClient
 from internacia.search import SearchClient
-from internacia.exceptions import ValidationError
 
 
 def test_countries_get_by_code_validation(mock_db_manager):

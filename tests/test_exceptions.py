@@ -1,8 +1,8 @@
 """Tests for custom exceptions."""
 
 from internacia.exceptions import (
-    InternaciaError,
     DatabaseError,
+    InternaciaError,
     NotFoundError,
     ValidationError,
 )

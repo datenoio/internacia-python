@@ -1,9 +1,10 @@
 """Thread-safe DuckDB connection manager for internacia SDK."""
 
 import logging
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Any
 
 import duckdb
 
@@ -62,11 +63,7 @@ class DatabaseManager:
                 logger.debug("Closing database connection")
                 conn.close()
 
-    def execute_query(
-        self,
-        query: str,
-        parameters: Optional[tuple] = None
-    ) -> list:
+    def execute_query(self, query: str, parameters: tuple | None = None) -> list:
         """
         Execute a query and return results as a list of tuples.
 
@@ -95,10 +92,8 @@ class DatabaseManager:
             raise DatabaseError(f"Query execution failed: {str(e)}") from e
 
     def execute_query_dict(
-        self,
-        query: str,
-        parameters: Optional[tuple] = None
-    ) -> list[dict]:
+        self, query: str, parameters: tuple | None = None
+    ) -> list[dict[str, Any]]:
         """
         Execute a query and return results as a list of dictionaries.
 
@@ -123,7 +118,7 @@ class DatabaseManager:
                 else:
                     cursor = conn.execute(query)
                 columns = [col[0] for col in cursor.description]
-                records = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                records = [dict(zip(columns, row, strict=True)) for row in cursor.fetchall()]
                 logger.debug("Query returned %s rows", len(records))
                 return records
         except Exception as e:
