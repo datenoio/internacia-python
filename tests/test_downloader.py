@@ -1,586 +1,251 @@
-"""Tests for downloader module."""
+"""Tests for the release downloader and cache (network mocked)."""
 
+import hashlib
+import logging
 from unittest.mock import Mock, patch
 
 import pytest
 import requests
 
-from internacia.downloader import (
-    check_for_updates,
-    download_database,
-    get_cache_dir,
-    get_cached_database_path,
-    get_database_info,
-    get_latest_version,
-    list_releases,
-)
+from internacia import downloader
 from internacia.exceptions import DownloadError, VersionError
 
-
-class TestGetCacheDir:
-    """Test get_cache_dir function."""
-
-    def test_get_cache_dir_env_var(self, tmp_path, monkeypatch):
-        """Test cache dir from environment variable."""
-        cache_path = tmp_path / "custom_cache"
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_path))
-
-        result = get_cache_dir()
-        assert result == cache_path
-        assert result.exists()
-
-    def test_get_cache_dir_default(self, tmp_path, monkeypatch):
-        """Test default cache directory."""
-        monkeypatch.delenv("INTERNACIA_CACHE_DIR", raising=False)
-
-        # Use tmp_path as home directory
-        fake_home = tmp_path / "home" / "test"
-        fake_home.mkdir(parents=True)
-
-        with patch("internacia.downloader.Path.home") as mock_home:
-            mock_home.return_value = fake_home
-            result = get_cache_dir()
-            assert result == fake_home / ".internacia"
-            assert result.exists()
-
-    def test_get_cache_dir_creates_directory(self, tmp_path, monkeypatch):
-        """Test that cache directory is created if it doesn't exist."""
-        cache_path = tmp_path / "new_cache"
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_path))
-
-        assert not cache_path.exists()
-        result = get_cache_dir()
-        assert result.exists()
+DB_BYTES = b"duckdb file bytes"
+DB_SHA = hashlib.sha256(DB_BYTES).hexdigest()
 
 
-class TestGetCachedDatabasePath:
-    """Test get_cached_database_path function."""
-
-    def test_get_cached_database_path_no_version(self, tmp_path, monkeypatch):
-        """Test cached path without version."""
-        monkeypatch.delenv("INTERNACIA_CACHE_DIR", raising=False)
-
-        # Use tmp_path as home directory
-        fake_home = tmp_path / "home" / "test"
-        fake_home.mkdir(parents=True)
-
-        with patch("internacia.downloader.Path.home") as mock_home:
-            mock_home.return_value = fake_home
-            result = get_cached_database_path()
-            assert result == fake_home / ".internacia" / "internacia.duckdb"
-            assert result.parent.exists()
-
-    def test_get_cached_database_path_with_version(self, tmp_path, monkeypatch):
-        """Test cached path with version."""
-        monkeypatch.delenv("INTERNACIA_CACHE_DIR", raising=False)
-
-        # Use tmp_path as home directory
-        fake_home = tmp_path / "home" / "test"
-        fake_home.mkdir(parents=True)
-
-        with patch("internacia.downloader.Path.home") as mock_home:
-            mock_home.return_value = fake_home
-            result = get_cached_database_path(version="v1.0.0")
-            assert result == fake_home / ".internacia" / "v1.0.0" / "internacia.duckdb"
-            assert result.parent.exists()
-
-    def test_get_cached_database_path_creates_version_dir(self, tmp_path, monkeypatch):
-        """Test that version directory is created."""
-        cache_path = tmp_path / "cache"
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_path))
-
-        result = get_cached_database_path(version="v1.0.0")
-        assert result.parent.exists()
-        assert result.parent.name == "v1.0.0"
+@pytest.fixture(autouse=True)
+def cache(tmp_path, monkeypatch):
+    cache_dir = tmp_path / "cache"
+    monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
+    monkeypatch.delenv("INTERNACIA_DATA_VERSION", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    return cache_dir
 
 
-class TestGetLatestVersion:
-    """Test get_latest_version function."""
+def _cached(cache_dir, *tags):
+    for tag in tags:
+        (cache_dir / tag).mkdir(parents=True, exist_ok=True)
+        (cache_dir / tag / "internacia.duckdb").write_bytes(b"x")
 
-    def test_get_latest_version_success(self):
-        """Test successful version fetch."""
-        mock_response = Mock()
-        mock_response.json.return_value = {"tag_name": "v1.0.0"}
-        mock_response.raise_for_status = Mock()
 
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            result = get_latest_version()
-            assert result == "v1.0.0"
+def _redirect(tag):
+    response = Mock(status_code=302, headers={"Location": f"{downloader.RELEASES_URL}/tag/{tag}"})
+    return response
 
-    def test_get_latest_version_no_tag(self):
-        """Test version fetch with no tag_name."""
-        mock_response = Mock()
-        mock_response.json.return_value = {}
-        mock_response.raise_for_status = Mock()
 
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(VersionError, match="No version tag"):
-                get_latest_version()
+def _fake_get(checksums: str | None, db_bytes: bytes = DB_BYTES):
+    """requests.get stand-in serving the database file and SHA256SUMS."""
+    calls = []
 
-    def test_get_latest_version_network_error(self):
-        """Test network error handling."""
-        with patch(
-            "internacia.downloader.requests.get",
-            side_effect=requests.exceptions.RequestException("Network error"),
-        ):
-            with pytest.raises(DownloadError, match="Failed to fetch latest version"):
-                get_latest_version()
+    def get(url, **kwargs):
+        calls.append(url)
+        response = Mock()
+        response.raise_for_status = Mock()
+        if url.endswith("/SHA256SUMS"):
+            response.status_code = 404 if checksums is None else 200
+            response.text = checksums or ""
+        else:
+            response.status_code = 200
+            response.headers = {"content-length": str(len(db_bytes))}
+            response.iter_content = Mock(return_value=[db_bytes])
+        return response
 
-    def test_get_latest_version_http_error(self):
-        """Test HTTP error handling."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError(
-            "404 Not Found", response=mock_response
+    get.calls = calls
+    return get
+
+
+class TestVersions:
+    @pytest.mark.parametrize(
+        ("value", "expected"), [("v3.1.0", (3, 1, 0)), ("3.10.2", (3, 10, 2)), ("latest", None)]
+    )
+    def test_parse_version(self, value, expected):
+        assert downloader.parse_version(value) == expected
+
+    def test_release_tag_normalizes_and_rejects(self):
+        assert downloader.release_tag("3.1.0") == "v3.1.0"
+        with pytest.raises(VersionError):
+            downloader.release_tag("latest")
+
+
+class TestCache:
+    def test_cache_dir_from_env_is_created(self, cache):
+        assert downloader.get_cache_dir() == cache
+        assert cache.is_dir()
+
+    def test_cache_dir_default(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("INTERNACIA_CACHE_DIR")
+        with patch("internacia.downloader.Path.home", return_value=tmp_path):
+            assert downloader.get_cache_dir() == tmp_path / ".internacia"
+
+    def test_cached_versions_sorted_by_semver(self, cache):
+        _cached(cache, "v3.9.0", "v3.10.0", "v2.2.0")
+        (cache / "v3.11.0").mkdir()  # no database inside
+        (cache / "notes").mkdir()
+        assert downloader.cached_versions() == ["v3.10.0", "v3.9.0", "v2.2.0"]
+
+    def test_cached_path_prefers_newest_supported_major(self, cache):
+        _cached(cache, "v3.1.0", "v3.2.0", "v4.0.0")
+        assert downloader.get_cached_database_path() == cache / "v3.2.0" / "internacia.duckdb"
+
+    def test_cached_path_for_version_and_legacy_fallback(self, cache):
+        assert (
+            downloader.get_cached_database_path("3.0.0") == cache / "v3.0.0" / "internacia.duckdb"
         )
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(DownloadError, match="Repository or release not found"):
-                get_latest_version()
-
-    def test_get_latest_version_404_error(self):
-        """Test 404 error handling with helpful message."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(DownloadError, match="Repository or release not found"):
-                get_latest_version()
+        assert downloader.get_cached_database_path() == cache / "internacia.duckdb"
 
 
-class TestGetDatabaseInfo:
-    """Test get_database_info function."""
+class TestLatestVersion:
+    def test_latest_from_redirect_without_api(self):
+        with (
+            patch("internacia.downloader.requests.head", return_value=_redirect("v3.2.0")) as head,
+            patch("internacia.downloader.requests.get") as get,
+        ):
+            assert downloader.get_latest_version() == "v3.2.0"
+        head.assert_called_once()
+        get.assert_not_called()
 
-    def test_get_database_info_latest(self):
-        """Test getting latest database info."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024000,
-                    "browser_download_url": "https://github.com/releases/download/v1.0.0/internacia.duckdb",
-                    "content_type": "application/octet-stream",
-                }
-            ],
-            "published_at": "2024-01-01T00:00:00Z",
-        }
-        mock_response.raise_for_status = Mock()
+    def test_newer_major_falls_back_to_newest_supported_release(self):
+        releases = [
+            {"tag_name": "v4.0.0", "assets": [{"name": "internacia.duckdb"}]},
+            {"tag_name": "v3.3.0", "assets": [{"name": "internacia.duckdb"}]},
+            {"tag_name": "v3.4.0", "assets": [{"name": "README.md"}]},
+        ]
+        api = Mock(status_code=200, json=Mock(return_value=releases), raise_for_status=Mock())
+        with (
+            patch("internacia.downloader.requests.head", return_value=_redirect("v4.0.0")),
+            patch("internacia.downloader.requests.get", return_value=api),
+        ):
+            assert downloader.get_latest_version() == "v3.3.0"
 
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            result = get_database_info()
-            assert result["version"] == "v1.0.0"
-            assert result["name"] == "internacia.duckdb"
-            assert result["size"] == 1024000
-            assert "download_url" in result
+    def test_no_supported_release(self):
+        api = Mock(status_code=200, json=Mock(return_value=[]), raise_for_status=Mock())
+        with (
+            patch("internacia.downloader.requests.head", return_value=_redirect("v4.0.0")),
+            patch("internacia.downloader.requests.get", return_value=api),
+        ):
+            with pytest.raises(VersionError):
+                downloader.get_latest_version()
 
-    def test_get_database_info_specific_version(self):
-        """Test getting specific version info."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024000,
-                    "browser_download_url": "https://github.com/releases/download/v1.0.0/internacia.duckdb",
-                    "content_type": "application/octet-stream",
-                }
-            ],
-            "published_at": "2024-01-01T00:00:00Z",
-        }
-        mock_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            result = get_database_info(version="v1.0.0")
-            assert result["version"] == "v1.0.0"
-
-    def test_get_database_info_no_asset(self):
-        """Test when no database asset is found."""
-        mock_response = Mock()
-        mock_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [],
-        }
-        mock_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(VersionError, match="No database file \\(.duckdb\\) found"):
-                get_database_info()
-
-    def test_get_database_info_network_error(self):
-        """Test network error handling."""
+    def test_unresolvable_latest(self):
         with patch(
-            "internacia.downloader.requests.get",
-            side_effect=requests.exceptions.RequestException("Network error"),
+            "internacia.downloader.requests.head", return_value=Mock(status_code=404, headers={})
         ):
             with pytest.raises(DownloadError):
-                get_database_info()
-
-    def test_get_database_info_404_error(self):
-        """Test 404 error handling with helpful message."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(DownloadError, match="Release not found"):
-                get_database_info()
-
-    def test_get_database_info_404_error_with_version(self):
-        """Test 404 error handling with specific version."""
-        mock_response = Mock()
-        mock_response.status_code = 404
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            with pytest.raises(DownloadError, match="Release not found.*version: v1.0.0"):
-                get_database_info(version="v1.0.0")
-
-
-class TestDownloadDatabase:
-    """Test download_database function."""
-
-    def test_download_database_success(self, tmp_path, monkeypatch):
-        """Test successful database download."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        # Mock GitHub API responses
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        # Mock download response
-        download_response = Mock()
-        download_response.iter_content.return_value = [b"fake database content"]
-        download_response.headers = {"content-length": "1024"}
-        download_response.raise_for_status = Mock()
-
-        # Create a temporary file to simulate the download
-        temp_file = tmp_path / "temp.duckdb.tmp"
-        temp_file.write_bytes(b"fake database content")
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response, download_response]
-            with patch("internacia.downloader._download_file") as mock_download:
-                # Make _download_file write to the temp file
-                def write_temp_file(url, dest, **kwargs):
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(b"fake database content")
-
-                mock_download.side_effect = write_temp_file
-                result = download_database()
-                assert result.exists()
-                assert result.stat().st_size > 0
-
-    def test_download_database_already_cached(self, tmp_path, monkeypatch):
-        """Test download when database already cached."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        # When version is None, the function gets latest version and uses it for cache path
-        # So we need to create the file at the versioned path
-        version_dir = cache_dir / "v1.0.0"
-        version_dir.mkdir()
-        cached_file = version_dir / "internacia.duckdb"
-        cached_file.write_bytes(b"existing database")
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        # Mock GitHub API - need to mock both get_latest_version and get_database_info
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response]
-            result = download_database()
-            assert result == cached_file
-
-    def test_download_database_force_redownload(self, tmp_path, monkeypatch):
-        """Test force re-download."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        cached_file = cache_dir / "internacia.duckdb"
-        cached_file.write_bytes(b"old database")
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        # Mock responses
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        download_response = Mock()
-        download_response.iter_content.return_value = [b"new database content"]
-        download_response.headers = {"content-length": "1024"}
-        download_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response, download_response]
-            with patch("internacia.downloader._download_file") as mock_download:
-                # Make _download_file write to the temp file
-                def write_temp_file(url, dest, **kwargs):
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(b"new database content")
-
-                mock_download.side_effect = write_temp_file
-                result = download_database(force=True)
-                # Should have attempted download
-                assert mock_get.call_count >= 2
-                assert result.exists()
-                assert result.stat().st_size > 0
-
-    def test_download_database_specific_version(self, tmp_path, monkeypatch):
-        """Test downloading specific version."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        download_response = Mock()
-        download_response.iter_content.return_value = [b"database content"]
-        download_response.headers = {"content-length": "1024"}
-        download_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [release_response, download_response]
-            with patch("internacia.downloader._download_file") as mock_download:
-                # Make _download_file write to the temp file
-                def write_temp_file(url, dest, **kwargs):
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(b"database content")
-
-                mock_download.side_effect = write_temp_file
-                result = download_database(version="v1.0.0")
-                # Should use version-specific URL
-                assert any("tags/v1.0.0" in str(call) for call in mock_get.call_args_list)
-                assert result.exists()
-                assert result.stat().st_size > 0
-
-    def test_download_database_no_download_url(self, tmp_path, monkeypatch):
-        """Test error when no download URL."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    # Missing browser_download_url
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response]
-            with pytest.raises(DownloadError, match="No download URL"):
-                download_database()
-
-    def test_download_database_network_error(self, tmp_path, monkeypatch):
-        """Test network error during download."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-        }
-        release_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [
-                latest_response,
-                release_response,
-                requests.exceptions.RequestException("Network error"),
-            ]
-            with pytest.raises(DownloadError):
-                download_database()
-
-
-class TestCheckForUpdates:
-    """Test check_for_updates function."""
-
-    def test_check_for_updates_success(self, tmp_path, monkeypatch):
-        """Test successful update check."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-            "published_at": "2024-01-01T00:00:00Z",
-        }
-        release_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response]
-            result = check_for_updates()
-            assert "has_update" in result
-            assert "latest_version" in result
-            assert result["latest_version"] == "v1.0.0"
-
-    def test_check_for_updates_with_cached_db(self, tmp_path, monkeypatch):
-        """Test update check when database is cached."""
-        cache_dir = tmp_path / "cache"
-        cache_dir.mkdir()
-        cached_file = cache_dir / "internacia.duckdb"
-        cached_file.write_bytes(b"database content")
-        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(cache_dir))
-
-        latest_response = Mock()
-        latest_response.json.return_value = {"tag_name": "v1.0.0"}
-        latest_response.raise_for_status = Mock()
-
-        release_response = Mock()
-        release_response.json.return_value = {
-            "tag_name": "v1.0.0",
-            "assets": [
-                {
-                    "name": "internacia.duckdb",
-                    "size": 1024,
-                    "browser_download_url": "https://example.com/db.duckdb",
-                }
-            ],
-            "published_at": "2024-01-01T00:00:00Z",
-        }
-        release_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get") as mock_get:
-            mock_get.side_effect = [latest_response, release_response]
-            result = check_for_updates()
-            assert result["current_path"] == cached_file
-
-    def test_check_for_updates_network_error(self):
-        """Test network error during update check."""
+                downloader.get_latest_version()
         with patch(
-            "internacia.downloader.requests.get",
-            side_effect=requests.exceptions.RequestException("Network error"),
+            "internacia.downloader.requests.head",
+            side_effect=requests.exceptions.ConnectionError("down"),
         ):
             with pytest.raises(DownloadError):
-                check_for_updates()
+                downloader.get_latest_version()
 
 
 class TestListReleases:
-    """Test list_releases function."""
+    def test_uses_github_token(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "secret")
+        api = Mock(
+            status_code=200,
+            raise_for_status=Mock(),
+            json=Mock(
+                return_value=[{"tag_name": "v3.0.0", "assets": [{"name": "internacia.duckdb"}]}]
+            ),
+        )
+        with patch("internacia.downloader.requests.get", return_value=api) as get:
+            releases = downloader.list_releases()
+        assert get.call_args.kwargs["headers"]["Authorization"] == "Bearer secret"
+        assert releases[0]["has_database"] and not releases[0]["has_checksums"]
 
-    def test_list_releases_success(self):
-        """Test successful release listing."""
-        mock_response = Mock()
-        mock_response.json.return_value = [
-            {
-                "tag_name": "v1.0.0",
-                "published_at": "2024-01-01T00:00:00Z",
-                "assets": [
-                    {
-                        "name": "internacia.duckdb",
-                        "size": 1024,
-                    }
-                ],
-            },
-            {
-                "tag_name": "v0.9.0",
-                "published_at": "2023-12-01T00:00:00Z",
-                "assets": [],
-            },
-        ]
-        mock_response.raise_for_status = Mock()
-
-        with patch("internacia.downloader.requests.get", return_value=mock_response):
-            result = list_releases()
-            assert len(result) == 2
-            assert result[0]["tag_name"] == "v1.0.0"
-            assert result[0]["has_database"] is True
-            assert result[1]["tag_name"] == "v0.9.0"
-            assert result[1]["has_database"] is False
-
-    def test_list_releases_network_error(self):
-        """Test network error during release listing."""
+    def test_error(self):
         with patch(
             "internacia.downloader.requests.get",
-            side_effect=requests.exceptions.RequestException("Network error"),
+            side_effect=requests.exceptions.ConnectionError("x"),
         ):
             with pytest.raises(DownloadError):
-                list_releases()
+                downloader.list_releases()
+
+
+class TestDownload:
+    def test_download_verifies_checksum(self, cache):
+        get = _fake_get(f"{DB_SHA}  internacia.duckdb\nabc  other.json\n")
+        with patch("internacia.downloader.requests.get", side_effect=get):
+            path = downloader.download_database("3.1.0", show_progress=False)
+        assert path == cache / "v3.1.0" / "internacia.duckdb"
+        assert path.read_bytes() == DB_BYTES
+        assert get.calls[0] == downloader.DOWNLOAD_URL.format(
+            tag="v3.1.0", name="internacia.duckdb"
+        )
+
+    def test_checksum_mismatch_leaves_no_file(self, cache):
+        get = _fake_get("0" * 64 + "  internacia.duckdb\n")
+        with patch("internacia.downloader.requests.get", side_effect=get):
+            with pytest.raises(DownloadError, match="failed verification"):
+                downloader.download_database("v3.1.0", show_progress=False)
+        assert not list((cache / "v3.1.0").iterdir())
+
+    def test_release_without_checksums_warns(self, cache, caplog):
+        with patch("internacia.downloader.requests.get", side_effect=_fake_get(None)):
+            with caplog.at_level(logging.WARNING, logger="internacia.downloader"):
+                path = downloader.download_database("v3.0.0", show_progress=False)
+        assert path.read_bytes() == DB_BYTES
+        assert "no SHA256SUMS" in caplog.text
+
+    def test_cached_release_is_not_downloaded_again(self, cache):
+        _cached(cache, "v3.0.0")
+        with patch("internacia.downloader.requests.get") as get:
+            assert downloader.download_database("v3.0.0") == cache / "v3.0.0" / "internacia.duckdb"
+        get.assert_not_called()
+
+    def test_force_redownloads(self, cache):
+        _cached(cache, "v3.0.0")
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=_fake_get(f"{DB_SHA}  internacia.duckdb\n"),
+        ):
+            path = downloader.download_database("v3.0.0", force=True, show_progress=False)
+        assert path.read_bytes() == DB_BYTES
+
+    def test_default_is_pinned_version_then_latest(self, cache, monkeypatch):
+        get = _fake_get(None)
+        monkeypatch.setenv("INTERNACIA_DATA_VERSION", "3.0.0")
+        with (
+            patch("internacia.downloader.requests.get", side_effect=get),
+            patch("internacia.downloader.requests.head") as head,
+        ):
+            assert downloader.download_database(show_progress=False).parent.name == "v3.0.0"
+        head.assert_not_called()
+        monkeypatch.delenv("INTERNACIA_DATA_VERSION")
+        with (
+            patch("internacia.downloader.requests.get", side_effect=get),
+            patch("internacia.downloader.requests.head", return_value=_redirect("v3.2.0")),
+        ):
+            assert downloader.download_database(show_progress=False).parent.name == "v3.2.0"
+
+    def test_missing_release_file(self, cache):
+        response = Mock(status_code=404, raise_for_status=Mock())
+        with patch("internacia.downloader.requests.get", return_value=response):
+            with pytest.raises(DownloadError, match="Not found"):
+                downloader.download_database("v9.9.9", show_progress=False)
+
+    def test_network_error(self, cache):
+        with patch(
+            "internacia.downloader.requests.get",
+            side_effect=requests.exceptions.ConnectionError("x"),
+        ):
+            with pytest.raises(DownloadError):
+                downloader.download_database("v3.0.0", show_progress=False)
+
+
+class TestCheckForUpdates:
+    @pytest.mark.parametrize(
+        ("cached", "has_update", "current"),
+        [((), True, None), (("v3.0.0",), True, "v3.0.0"), (("v3.0.0", "v3.2.0"), False, "v3.2.0")],
+    )
+    def test_compares_semver(self, cache, cached, has_update, current):
+        _cached(cache, *cached)
+        with patch("internacia.downloader.requests.head", return_value=_redirect("v3.2.0")):
+            result = downloader.check_for_updates()
+        assert result["has_update"] is has_update
+        assert result["current_version"] == current
+        assert result["latest_version"] == "v3.2.0"
+        assert (result["current_path"] is None) is (current is None)

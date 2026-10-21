@@ -39,104 +39,63 @@ cd internacia-python
 pip install -e .
 ```
 
-## Prerequisites
+## Getting the database
 
-Before using the SDK, you need to have the internacia-db dataset built. The SDK expects a DuckDB database file at:
-
-```
-../internacia-db/data/datasets/internacia.duckdb
-```
-
-To build the database, navigate to the `internacia-db` repository and run:
-
-```bash
-python3 scripts/builder.py build --formats duckdb
-```
-
-### Downloading the Database
-
-Alternatively, you can download a pre-built database directly from GitHub releases (similar to NLTK's download mechanism):
+The SDK reads an `internacia.duckdb` file from an
+[internacia-db release](https://github.com/datenoio/internacia-db/releases). Download it once
+(similar to NLTK's download mechanism):
 
 ```python
-from internacia import download_database
+from internacia import InternaciaClient, download_database
 
-# Download the latest version
-db_path = download_database()
+download_database()                    # newest release with a supported contract
+download_database(version="3.0.0")     # a specific release ("v3.0.0" also works)
+download_database(force=True)          # re-download even if cached
+download_database(show_progress=True)  # progress bar (pip install internacia[progress])
 
-# Download a specific version
-db_path = download_database(version="v3.0.0")
-
-# Force re-download even if already cached
-db_path = download_database(force=True)
-
-# Download with progress bar (requires tqdm: pip install internacia[progress])
-db_path = download_database(show_progress=True)
-
-# Download without progress bar
-db_path = download_database(show_progress=False)
+client = InternaciaClient()            # uses the newest cached release
 ```
 
-The database will be cached in `~/.internacia/<version>/internacia.duckdb` (for example `~/.internacia/v3.0.0/internacia.duckdb`) by default. You can customize the cache location using the `INTERNACIA_CACHE_DIR` environment variable:
+- Files come from direct release download URLs, so downloading does not hit the GitHub API
+  rate limit. The API is only used by `list_releases()`, or when the latest release has a
+  newer contract major; set `GITHUB_TOKEN` to authenticate those calls.
+- Each download is checked against the release's `SHA256SUMS`. Releases published before
+  `SHA256SUMS` existed (v3.0.0) are downloaded with a warning.
+- Releases are cached in `~/.internacia/<tag>/internacia.duckdb` (override with
+  `INTERNACIA_CACHE_DIR`). The client picks the newest cached release by semantic version.
 
-```bash
-export INTERNACIA_CACHE_DIR="/path/to/cache"
-```
-
-The SDK will automatically use the cached database if found. You can also check for updates:
+Pin a release with `InternaciaClient(data_version="3.0.0")` or `INTERNACIA_DATA_VERSION`; the
+same variable is the default version for `download_database()`. To use any other file (for
+example a local `python scripts/builder.py build` in internacia-db), pass `db_path=` or set
+`INTERNACIA_DB_PATH`.
 
 ```python
-from internacia import check_for_updates, get_latest_version
+from internacia import check_for_updates, cached_versions, get_latest_version
 
-# Check if updates are available
-update_info = check_for_updates()
-if update_info["has_update"]:
-    print(f"Latest version: {update_info['latest_version']}")
-    download_database()
+update = check_for_updates()   # compares the newest cached release with the newest release
+if update["has_update"]:
+    download_database(update["latest_version"])
 
-# Get latest version without downloading
-latest = get_latest_version()
-print(f"Latest version: {latest}")
+print(get_latest_version(), cached_versions())
 ```
 
-### Keeping the Database Up to Date
+### Version and contract
 
-To keep your SDK database current with the latest data from internacia-db:
-
-1. **Check for updates** in the `internacia-db` repository:
-   ```bash
-   cd ../internacia-db
-   git pull origin main
-   ```
-
-2. **Rebuild the database** with the latest data:
-   ```bash
-   python3 scripts/builder.py build --formats duckdb
-   ```
-
-3. **Verify the database** was updated successfully:
-   ```bash
-   ls -lh data/datasets/internacia.duckdb
-   ```
-
-**Helper Script**: For convenience, you can use the provided script to automate this process:
-```bash
-./scripts/update_database.sh
-```
-
-This script will automatically pull the latest changes, rebuild the database, and verify the update.
-
-The SDK will automatically use the updated database file on the next client initialization. No code changes are required.
-
-**When to update:**
-- After pulling new changes from the internacia-db repository
-- When you need the latest country or international block data
-- If you notice data inconsistencies or missing information
-
-**Download Method**: You can also update using the download function:
 ```python
-from internacia import download_database
-download_database()  # Downloads latest version
+meta = client.meta()
+meta["version"]            # "3.0.0"
+meta["contract_version"]   # "3.0"
+meta["datasets"]["countries"]  # {"row_count": 256, "schema_hash": "..."}
 ```
+
+internacia-db versions its schema as a data contract (`contract_version` = `MAJOR.MINOR`). This
+SDK release supports contract **3.x** and was tested against **3.0**:
+
+- A different MAJOR raises `ContractError` when the client is created.
+- A newer MINOR (new tables, columns or enum values) is accepted with a logged warning.
+- `InternaciaClient(check_contract=False)` skips the check.
+- Enum-like fields (`status`, `scope_category`, `geographic_scope`, …) are open strings: new
+  values can appear in any MINOR release.
 
 ## Quick Start
 
@@ -319,13 +278,19 @@ export INTERNACIA_LOG_LEVEL="DEBUG"
 
 # Set custom cache directory for downloaded databases
 export INTERNACIA_CACHE_DIR="/path/to/cache"
+
+# Pin a cached release (also the default for download_database())
+export INTERNACIA_DATA_VERSION="3.0.0"
+
+# Authenticate GitHub API calls (list_releases)
+export GITHUB_TOKEN="..."
 ```
 
 The SDK will automatically use these environment variables if set. Priority order for database path resolution:
 1. Explicit `db_path` parameter
 2. `INTERNACIA_DB_PATH` environment variable
-3. Default relative path (`../internacia-db/data/datasets/internacia.duckdb`)
-4. Cached database from `~/.internacia/internacia.duckdb`
+3. The cached release pinned by `data_version` / `INTERNACIA_DATA_VERSION`
+4. The newest cached release with a supported contract major
 
 #### Logging
 
@@ -407,8 +372,9 @@ Exception types:
 - `DatabaseError`: Database connection or query errors
 - `NotFoundError`: Resource not found (e.g., country code doesn't exist)
 - `ValidationError`: Input validation errors (e.g., empty query string)
-- `DownloadError`: Database download failures
+- `DownloadError`: Database download or checksum verification failures
 - `VersionError`: Version-related errors
+- `ContractError` (a `VersionError`): the database's data contract major is not supported
 
 ## Data Structure
 
@@ -493,10 +459,11 @@ pip install -e ".[dev]"
 
 ### Running Tests
 
-The suite has two parts:
+The suite has three parts:
 
 - **Unit tests** (`tests/test_*.py`) mock the database and cover validation, error paths and the downloader.
 - **Integration tests** (`tests/integration/`) run every public method and every `examples/*.py` script against a real internacia-db release DuckDB file. They are skipped unless `INTERNACIA_TEST_DB_PATH` is set, and they fail in CI if it is missing.
+- **Contract tests** (`tests/contract/`) are the portable subset that internacia-db runs against every fresh build before a release (`INTERNACIA_CONTRACT_DB_PATH`, falling back to `INTERNACIA_TEST_DB_PATH` here). They check `meta()` and the contract, every public method on stable facts, plain Python result types, and that unknown enum values are accepted.
 
 ```bash
 # Unit tests only

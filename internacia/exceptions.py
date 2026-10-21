@@ -23,3 +23,7 @@ class DownloadError(InternaciaError):
 
 class VersionError(InternaciaError):
     """Version-related errors."""
+
+
+class ContractError(VersionError):
+    """The database's data contract is not supported by this SDK."""

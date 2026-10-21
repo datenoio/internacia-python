@@ -23,28 +23,38 @@ Main client class for accessing internacia-db data.
 ```python
 InternaciaClient(
     db_path: Optional[Path] = None,
-    data_dir: Optional[Path] = None
+    data_dir: Optional[Path] = None,
+    data_version: Optional[str] = None,
+    check_contract: bool = True,
 )
 ```
 
 **Parameters:**
-- `db_path` (Optional[Path]): Path to the DuckDB database file. If `None`, the SDK will attempt to find it in the default location or via environment variables.
-- `data_dir` (Optional[Path]): Path to the internacia-db data directory (currently unused, reserved for future use).
+- `db_path` (Optional[Path]): Path to the DuckDB database file. If `None`, uses `INTERNACIA_DB_PATH`, then the cached release pinned by `data_version` / `INTERNACIA_DATA_VERSION`, then the newest cached release with a supported contract major.
+- `data_dir` (Optional[Path]): Unused; kept for backward compatibility.
+- `data_version` (Optional[str]): Cached release to use, e.g. `"3.0.0"`.
+- `check_contract` (bool): Verify the database's data contract (default `True`).
 
 **Raises:**
-- `FileNotFoundError`: If the database file cannot be found at the specified or default location.
+- `FileNotFoundError`: If no database file is found.
+- `ContractError`: If the database's contract major is not supported (or it has no `_meta` table).
 
 **Example:**
 ```python
 from internacia import InternaciaClient
 from pathlib import Path
 
-# Use default database location
-client = InternaciaClient()
-
-# Use custom database path
+client = InternaciaClient()                      # newest cached release
+client = InternaciaClient(data_version="3.0.0")  # a pinned cached release
 client = InternaciaClient(db_path=Path("/path/to/internacia.duckdb"))
 ```
+
+### `meta() -> dict`
+
+Version and build information from the database's `_meta` table: `version`,
+`contract_version` (`MAJOR.MINOR`; derived from `version` for internacia-db 3.0.0),
+`build_date`, `git_commit`, `data_license`, and `datasets`
+(`{name: {"row_count": int, "schema_hash": str}}`).
 
 **Attributes:**
 - `countries` (CountriesClient): Client for querying countries data
@@ -608,149 +618,87 @@ blocks = client.search.search_intblocks("EU")
 
 ## Downloader Functions
 
-Functions for downloading and managing the database.
+Release files are downloaded from direct GitHub release URLs (no API rate limit). The GitHub
+API is only used by `list_releases()` and when the latest release has a newer contract major;
+`GITHUB_TOKEN` authenticates those calls.
 
-### `download_database(version: Optional[str] = None, force: bool = False, show_progress: bool = True, cache_dir: Optional[Path] = None) -> Path`
+### `download_database(version: Optional[str] = None, force: bool = False, show_progress: bool = True) -> Path`
 
-Download the database from GitHub releases.
+Download a release database into the cache and verify it against the release's `SHA256SUMS`.
 
 **Parameters:**
-- `version` (Optional[str]): Version string (e.g., "v3.0.0"). If `None`, downloads the latest version.
-- `force` (bool): Force re-download even if already cached (default: False)
-- `show_progress` (bool): Show download progress bar (default: True, requires `tqdm`)
-- `cache_dir` (Optional[Path]): Custom cache directory. If `None`, uses default cache location.
+- `version` (Optional[str]): Release, e.g. `"v3.0.0"` or `"3.0.0"`. Defaults to `INTERNACIA_DATA_VERSION`, else the newest release with a supported contract major.
+- `force` (bool): Re-download even if already cached (default: False)
+- `show_progress` (bool): Show a progress bar (default: True, requires `tqdm`)
 
-**Returns:**
-- `Path`: Path to the downloaded database file
+**Returns:** `Path` to `<cache>/<tag>/internacia.duckdb`.
 
 **Raises:**
-- `DownloadError`: If download fails
-- `VersionError`: If specified version not found
+- `DownloadError`: If the download fails or the checksum does not match
+- `VersionError`: If the version is invalid or no compatible release exists
 
-**Example:**
+Releases published before `SHA256SUMS` existed (v3.0.0) are downloaded with a logged warning.
+
 ```python
 from internacia import download_database
 
-# Download latest version
 db_path = download_database()
-
-# Download specific version
-db_path = download_database(version="v3.0.0")
-
-# Force re-download
-db_path = download_database(force=True)
+db_path = download_database(version="v3.0.0", force=True)
 ```
 
 ---
 
 ### `get_latest_version() -> str`
 
-Fetch the latest release version from GitHub.
+Newest release tag with a supported contract major (e.g. `"v3.0.0"`), resolved from the
+`/releases/latest` redirect.
 
-**Returns:**
-- `str`: Latest version string (e.g., "v3.0.0")
-
-**Raises:**
-- `DownloadError`: If unable to fetch version information
-- `VersionError`: If no releases found
-
-**Example:**
-```python
-from internacia import get_latest_version
-
-latest = get_latest_version()
-print(f"Latest version: {latest}")
-```
+**Raises:** `DownloadError` (network), `VersionError` (no compatible release).
 
 ---
 
 ### `check_for_updates() -> dict`
 
-Check if a newer database version is available.
+Compare the newest cached release with `get_latest_version()`.
 
-**Returns:**
-- `dict`: Dictionary with keys:
-  - `has_update` (bool): Whether an update is available
-  - `current_version` (Optional[str]): Current cached version, if any
-  - `latest_version` (str): Latest available version
+**Returns:** `has_update` (bool), `current_version` (Optional[str]), `latest_version` (str),
+`current_path` (Optional[Path]).
 
-**Raises:**
-- `DownloadError`: If unable to check for updates
-
-**Example:**
 ```python
-from internacia import check_for_updates
+from internacia import check_for_updates, download_database
 
-update_info = check_for_updates()
-if update_info["has_update"]:
-    print(f"Update available: {update_info['latest_version']}")
+update = check_for_updates()
+if update["has_update"]:
+    download_database(update["latest_version"])
 ```
 
 ---
 
 ### `list_releases() -> list`
 
-List all available releases and their database file status.
+Releases from the GitHub API, newest first: `tag_name`, `published_at`, `has_database`,
+`has_checksums`, `asset_names`.
 
-**Returns:**
-- `list`: List of dictionaries with release information:
-  - `version` (str): Release version
-  - `published_at` (str): Publication date
-  - `has_database` (bool): Whether the release includes a database file
-  - `database_size` (Optional[int]): Database file size in bytes, if available
+**Raises:** `DownloadError`.
 
-**Raises:**
-- `DownloadError`: If unable to fetch releases
+---
 
-**Example:**
-```python
-from internacia import list_releases
+### `cached_versions() -> list`
 
-releases = list_releases()
-for release in releases:
-    if release["has_database"]:
-        print(f"{release['version']}: {release['database_size']} bytes")
-```
+Cached release tags, newest first by semantic version.
 
 ---
 
 ### `get_cache_dir() -> Path`
 
-Get the cache directory for downloaded databases.
-
-**Returns:**
-- `Path`: Path to cache directory
-
-**Example:**
-```python
-from internacia import get_cache_dir
-
-cache_dir = get_cache_dir()
-print(f"Cache directory: {cache_dir}")
-```
+`INTERNACIA_CACHE_DIR` if set, else `~/.internacia/` (created if missing).
 
 ---
 
 ### `get_cached_database_path(version: Optional[str] = None) -> Path`
 
-Get the path to the cached database file.
-
-**Parameters:**
-- `version` (Optional[str]): Optional version string. If `None`, returns path to latest cache.
-
-**Returns:**
-- `Path`: Path to cached database file
-
-**Example:**
-```python
-from internacia import get_cached_database_path
-
-# Get latest cached database path
-latest_path = get_cached_database_path()
-
-# Get specific version path
-version_path = get_cached_database_path(version="v3.0.0")
-```
+With `version`: `<cache>/<tag>/internacia.duckdb` (may not exist yet). Without: the newest
+cached release with a supported contract major, else the legacy `<cache>/internacia.duckdb`.
 
 ---
 
@@ -971,6 +919,13 @@ except VersionError as e:
 ```
 
 ---
+
+
+### ContractError
+
+Subclass of `VersionError`. Raised by `InternaciaClient` when the database's contract major is
+not the one this SDK supports (`SUPPORTED_CONTRACT_MAJOR`), or the database has no `_meta`
+table. A newer contract minor only logs a warning.
 
 ## Return Types
 

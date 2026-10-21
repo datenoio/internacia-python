@@ -59,6 +59,7 @@ def derived_db(real_db_path: Path, tmp_path: Path) -> Callable[[str, str], Path]
             conn.execute(f"ATTACH '{real_db_path.as_posix()}' AS src (READ_ONLY)")
             conn.execute(f"CREATE TABLE countries AS {countries_sql}")
             conn.execute(f"CREATE TABLE intblocks AS {intblocks_sql}")
+            conn.execute("CREATE TABLE _meta AS SELECT * FROM src._meta")
         finally:
             conn.close()
         return path

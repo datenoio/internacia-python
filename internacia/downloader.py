@@ -1,511 +1,315 @@
-"""Database downloader for internacia SDK, similar to NLTK's download mechanism."""
+"""Download internacia-db release databases, verify them, and manage the local cache.
 
+Release files are fetched from their direct GitHub download URLs, so downloading does
+not use the GitHub API or its 60-requests-per-hour anonymous limit. The API is only
+used to list releases (``list_releases``) or to find the newest release with a
+supported contract major when the latest release has a newer one. Set ``GITHUB_TOKEN``
+to authenticate those API calls.
+"""
+
+import hashlib
 import logging
 import os
+import re
 import shutil
 from pathlib import Path
 
 import requests
 
 from internacia.config import Config
+from internacia.contract import SUPPORTED_CONTRACT_MAJOR
 from internacia.exceptions import DownloadError, VersionError
 
 logger = logging.getLogger(__name__)
 
-# GitHub API endpoints
-GITHUB_API_BASE = "https://api.github.com"
 GITHUB_REPO = "datenoio/internacia-db"
-GITHUB_RELEASES_URL = f"{GITHUB_API_BASE}/repos/{GITHUB_REPO}/releases"
-GITHUB_LATEST_RELEASE_URL = f"{GITHUB_RELEASES_URL}/latest"
+RELEASES_URL = f"https://github.com/{GITHUB_REPO}/releases"
+LATEST_RELEASE_URL = f"{RELEASES_URL}/latest"
+DOWNLOAD_URL = RELEASES_URL + "/download/{tag}/{name}"
+GITHUB_API_RELEASES_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+
+DB_FILE = "internacia.duckdb"
+CHECKSUMS_FILE = "SHA256SUMS"
+
+_VERSION_RE = re.compile(r"^v?(\d+)\.(\d+)\.(\d+)$")
+
+
+def parse_version(version: str) -> tuple[int, int, int] | None:
+    """``"v3.1.0"`` or ``"3.1.0"`` → ``(3, 1, 0)``; None for anything else."""
+    match = _VERSION_RE.match(version.strip())
+    return (int(match[1]), int(match[2]), int(match[3])) if match else None
+
+
+def release_tag(version: str) -> str:
+    """Normalize a version to its release tag (``"3.1.0"`` → ``"v3.1.0"``)."""
+    parsed = parse_version(version)
+    if parsed is None:
+        raise VersionError(f"Not a release version: {version!r} (expected e.g. 'v3.1.0')")
+    return "v{}.{}.{}".format(*parsed)
+
+
+def _api_headers() -> dict[str, str]:
+    headers = {"Accept": "application/vnd.github+json"}
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
 
 
 def get_cache_dir() -> Path:
     """
     Get the cache directory for downloaded databases.
 
-    Priority:
-    1. INTERNACIA_CACHE_DIR environment variable
-    2. ~/.internacia/
-    3. OS-specific cache directory
-
-    Returns:
-        Path to cache directory
+    ``INTERNACIA_CACHE_DIR`` if set, else ``~/.internacia/``. Created if missing.
     """
-    # Check environment variable first
     env_cache = os.getenv(Config.ENV_CACHE_DIR)
-    if env_cache:
-        cache_dir = Path(env_cache).expanduser()
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        return cache_dir
-
-    # Default to ~/.internacia/
-    home_dir = Path.home()
-    cache_dir = home_dir / ".internacia"
+    cache_dir = Path(env_cache).expanduser() if env_cache else Path.home() / ".internacia"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 
 
+def cached_versions() -> list[str]:
+    """Release tags with a cached database, newest first (semantic version order)."""
+    tags = []
+    for item in get_cache_dir().iterdir():
+        parsed = parse_version(item.name)
+        if parsed and (item / DB_FILE).is_file():
+            tags.append((parsed, item.name))
+    return [name for _, name in sorted(tags, reverse=True)]
+
+
 def get_cached_database_path(version: str | None = None) -> Path:
     """
-    Get the path to the cached database file.
+    Path of a cached database.
 
-    Args:
-        version: Optional version string. If None, uses 'latest'
-
-    Returns:
-        Path to cached database file
+    With ``version``: ``<cache>/<tag>/internacia.duckdb`` (which may not exist yet).
+    Without: the newest cached release with a supported contract major, else the legacy
+    unversioned ``<cache>/internacia.duckdb``.
     """
     cache_dir = get_cache_dir()
     if version:
-        # Versioned cache: ~/.internacia/v1.0.0/internacia.duckdb
-        version_dir = cache_dir / version
-        version_dir.mkdir(parents=True, exist_ok=True)
-        return version_dir / "internacia.duckdb"
-    # Latest cache: ~/.internacia/internacia.duckdb
-    return cache_dir / "internacia.duckdb"
+        return cache_dir / release_tag(version) / DB_FILE
+    for tag in cached_versions():
+        parsed = parse_version(tag)
+        if parsed and parsed[0] == SUPPORTED_CONTRACT_MAJOR:
+            return cache_dir / tag / DB_FILE
+    return cache_dir / DB_FILE
+
+
+def list_releases() -> list[dict]:
+    """
+    List internacia-db releases via the GitHub API (uses ``GITHUB_TOKEN`` if set).
+
+    Returns dictionaries with ``tag_name``, ``published_at``, ``has_database``,
+    ``has_checksums`` and ``asset_names``, newest first.
+
+    Raises:
+        DownloadError: If the releases cannot be fetched
+    """
+    try:
+        response = requests.get(GITHUB_API_RELEASES_URL, timeout=10, headers=_api_headers())
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        raise DownloadError(f"Failed to fetch releases from the GitHub API: {e}") from e
+    releases = []
+    for release in response.json():
+        names = [asset.get("name", "") for asset in release.get("assets", [])]
+        releases.append(
+            {
+                "tag_name": release.get("tag_name", ""),
+                "published_at": release.get("published_at", ""),
+                "has_database": DB_FILE in names,
+                "has_checksums": CHECKSUMS_FILE in names,
+                "asset_names": names,
+            }
+        )
+    return releases
+
+
+def _latest_release_tag() -> str:
+    """Tag of the latest release, read from the ``/releases/latest`` redirect."""
+    try:
+        response = requests.head(LATEST_RELEASE_URL, allow_redirects=False, timeout=10)
+    except requests.exceptions.RequestException as e:
+        raise DownloadError(f"Failed to resolve the latest internacia-db release: {e}") from e
+    tag = response.headers.get("Location", "").rstrip("/").rsplit("/", 1)[-1]
+    if response.status_code not in (301, 302, 303, 307, 308) or parse_version(tag) is None:
+        raise DownloadError(
+            f"Could not resolve the latest internacia-db release from {LATEST_RELEASE_URL} "
+            f"(HTTP {response.status_code})"
+        )
+    return tag
 
 
 def get_latest_version() -> str:
     """
-    Fetch the latest release version from GitHub.
-
-    Returns:
-        Latest version string (e.g., "v1.0.0")
+    Newest release tag whose contract major this SDK supports (e.g. ``"v3.1.0"``).
 
     Raises:
-        DownloadError: If unable to fetch version information
-        VersionError: If no releases found
+        DownloadError: If release information cannot be fetched
+        VersionError: If no release has a supported contract major
     """
+    tag = _latest_release_tag()
+    if parse_version(tag)[0] == SUPPORTED_CONTRACT_MAJOR:  # type: ignore[index]
+        return tag
+    logger.info("Latest release %s has a different contract major; searching older releases", tag)
+    compatible = [
+        (parsed, r["tag_name"])
+        for r in list_releases()
+        if r["has_database"]
+        and (parsed := parse_version(r["tag_name"])) is not None
+        and parsed[0] == SUPPORTED_CONTRACT_MAJOR
+    ]
+    if not compatible:
+        raise VersionError(f"No internacia-db {SUPPORTED_CONTRACT_MAJOR}.x release found")
+    return str(max(compatible)[1])
+
+
+def _fetch_checksums(tag: str) -> dict[str, str] | None:
+    """``{file name: sha256}`` from the release's SHA256SUMS; None if the release has none."""
+    url = DOWNLOAD_URL.format(tag=tag, name=CHECKSUMS_FILE)
     try:
-        logger.debug("Fetching latest release from: %s", GITHUB_LATEST_RELEASE_URL)
-        response = requests.get(
-            GITHUB_LATEST_RELEASE_URL,
-            timeout=10,
-            headers={"Accept": "application/vnd.github.v3+json"},
-        )
-
-        # Handle 404 specifically with a helpful error message
-        if response.status_code == 404:
-            error_msg = (
-                f"Repository or release not found at {GITHUB_REPO}.\n"
-                "This could mean:\n"
-                "  1. The repository doesn't exist or has been renamed\n"
-                "  2. The repository has no releases yet\n"
-                "  3. The repository is private and requires authentication\n\n"
-                "Alternative: You can build the database locally by:\n"
-                "  1. Cloning the internacia-db repository\n"
-                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
-                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
-            )
-            logger.error(error_msg)
-            raise DownloadError(error_msg)
-
-        response.raise_for_status()
-
-        data = response.json()
-        version = data.get("tag_name")
-
-        if not isinstance(version, str) or not version:
-            raise VersionError("No version tag found in latest release")
-
-        logger.info("Latest version: %s", version)
-        return version
-
-    except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            # Already handled above, but catch here for safety
-            error_msg = (
-                f"Repository or release not found at {GITHUB_REPO}.\n"
-                "This could mean:\n"
-                "  1. The repository doesn't exist or has been renamed\n"
-                "  2. The repository has no releases yet\n"
-                "  3. The repository is private and requires authentication\n\n"
-                "Alternative: You can build the database locally by:\n"
-                "  1. Cloning the internacia-db repository\n"
-                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
-                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
-            )
-            logger.error(error_msg)
-            raise DownloadError(error_msg) from e
-        logger.error("Failed to fetch latest version: %s", str(e))
-        raise DownloadError(f"Failed to fetch latest version: {e}") from e
+        response = requests.get(url, timeout=30)
     except requests.exceptions.RequestException as e:
-        logger.error("Failed to fetch latest version: %s", str(e))
-        raise DownloadError(f"Failed to fetch latest version: {e}") from e
-    except KeyError as e:
-        logger.error("Invalid response format: %s", str(e))
-        raise VersionError(f"Invalid release response format: {e}") from e
-
-
-def get_database_info(version: str | None = None) -> dict:
-    """
-    Get database metadata for a specific version.
-
-    Args:
-        version: Version string (e.g., "v1.0.0"). If None, uses latest.
-
-    Returns:
-        Dictionary with database metadata (size, download_url, etc.)
-
-    Raises:
-        DownloadError: If unable to fetch version information
-        VersionError: If version not found
-    """
+        raise DownloadError(f"Failed to download {url}: {e}") from e
+    if response.status_code == 404:
+        return None
     try:
-        if version:
-            # Fetch specific version
-            url = f"{GITHUB_RELEASES_URL}/tags/{version}"
-        else:
-            # Fetch latest
-            url = GITHUB_LATEST_RELEASE_URL
-
-        logger.debug("Fetching release info from: %s", url)
-        response = requests.get(
-            url,
-            timeout=10,
-            headers={"Accept": "application/vnd.github.v3+json"},
-        )
-
-        # Handle 404 specifically with a helpful error message
-        if response.status_code == 404:
-            error_msg = (
-                f"Release not found for {GITHUB_REPO}"
-                + (f" (version: {version})" if version else "")
-                + ".\n"
-                "This could mean:\n"
-                "  1. The repository doesn't exist or has been renamed\n"
-                "  2. The specified version doesn't exist\n"
-                "  3. The repository has no releases yet\n"
-                "  4. The repository is private and requires authentication\n\n"
-                "Alternative: You can build the database locally by:\n"
-                "  1. Cloning the internacia-db repository\n"
-                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
-                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
-            )
-            logger.error(error_msg)
-            raise DownloadError(error_msg)
-
         response.raise_for_status()
-
-        data = response.json()
-
-        # Find database asset
-        assets = data.get("assets", [])
-        db_asset = None
-        for asset in assets:
-            if asset.get("name", "").endswith(".duckdb"):
-                db_asset = asset
-                break
-
-        if not db_asset:
-            release_tag = data.get("tag_name", version or "latest")
-            asset_names = [asset.get("name", "") for asset in assets] if assets else []
-
-            error_msg = f"No database file (.duckdb) found in release {release_tag}.\n"
-
-            if assets:
-                available = ", ".join(asset_names) if asset_names else "none"
-                error_msg += f"Available assets in this release: {available}\n"
-            else:
-                error_msg += "This release has no assets attached.\n"
-
-            error_msg += (
-                "\nThis could mean:\n"
-                "  1. The database file hasn't been uploaded to this release yet\n"
-                "  2. The database file is available in a different release\n"
-                "  3. The database needs to be built from source\n\n"
-                "Alternatives:\n"
-                "  1. Check other releases for a database file:\n"
-                "     from internacia import list_releases\n"
-                "     releases = list_releases()\n"
-                "     # Look for releases with has_database=True\n"
-                "  2. Build the database locally:\n"
-                "     - Clone the internacia-db repository\n"
-                "     - Run: python3 scripts/builder.py build --formats duckdb\n"
-                "     - Set INTERNACIA_DB_PATH to point to the built database\n"
-                "  3. Use the source data directly from the repository"
-            )
-
-            logger.error(error_msg)
-            raise VersionError(error_msg)
-
-        return {
-            "version": data.get("tag_name", version or "latest"),
-            "name": db_asset.get("name"),
-            "size": db_asset.get("size", 0),
-            "download_url": db_asset.get("browser_download_url"),
-            "content_type": db_asset.get("content_type"),
-            "published_at": data.get("published_at"),
-        }
-
     except requests.exceptions.HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            # Already handled above, but catch here for safety
-            error_msg = (
-                f"Release not found for {GITHUB_REPO}"
-                + (f" (version: {version})" if version else "")
-                + ".\n"
-                "This could mean:\n"
-                "  1. The repository doesn't exist or has been renamed\n"
-                "  2. The specified version doesn't exist\n"
-                "  3. The repository has no releases yet\n"
-                "  4. The repository is private and requires authentication\n\n"
-                "Alternative: You can build the database locally by:\n"
-                "  1. Cloning the internacia-db repository\n"
-                "  2. Running: python3 scripts/builder.py build --formats duckdb\n"
-                "  3. Setting INTERNACIA_DB_PATH to point to the built database"
-            )
-            logger.error(error_msg)
-            raise DownloadError(error_msg) from e
-        logger.error("Failed to fetch database info: %s", str(e))
-        raise DownloadError(f"Failed to fetch database info: {str(e)}") from e
-    except requests.exceptions.RequestException as e:
-        logger.error("Failed to fetch database info: %s", str(e))
-        raise DownloadError(f"Failed to fetch database info: {str(e)}") from e
-    except KeyError as e:
-        logger.error("Invalid response format: %s", str(e))
-        raise VersionError(f"Invalid release response format: {str(e)}") from e
+        raise DownloadError(f"Failed to download {url}: {e}") from e
+    checksums = {}
+    for line in response.text.splitlines():
+        digest, _, name = line.partition("  ")
+        if name:
+            checksums[name.strip()] = digest.strip().lower()
+    return checksums
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _download_file(url: str, destination: Path, show_progress: bool = True) -> None:
-    """
-    Download a file from URL to destination with progress bar.
-
-    Args:
-        url: URL to download from
-        destination: Path to save the file
-        show_progress: Whether to show progress bar
-
-    Raises:
-        DownloadError: If download fails
-    """
+    """Stream ``url`` to ``destination``; a tqdm progress bar is shown when available."""
     try:
         logger.info("Downloading from: %s", url)
         response = requests.get(url, stream=True, timeout=30)
+        if response.status_code == 404:
+            raise DownloadError(f"Not found: {url}")
         response.raise_for_status()
-
         total_size = int(response.headers.get("content-length", 0))
-
-        # Try to use tqdm if available
-        use_tqdm = False
-        if show_progress:
+        progress = None
+        if show_progress and total_size > 0:
             try:
                 import tqdm  # pylint: disable=import-outside-toplevel
 
-                use_tqdm = True
-            except ImportError:
-                pass
-
-        destination.parent.mkdir(parents=True, exist_ok=True)
-
-        # Download with progress
-        if use_tqdm and total_size > 0:
-            # tqdm is imported conditionally above
-            import tqdm  # pylint: disable=import-outside-toplevel
-
-            with (
-                open(destination, "wb") as f,
-                tqdm.tqdm(
+                progress = tqdm.tqdm(
                     total=total_size,
                     unit="B",
                     unit_scale=True,
                     unit_divisor=1024,
                     desc="Downloading",
-                ) as pbar,
-            ):
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        pbar.update(len(chunk))
-        else:
-            # Simple download without progress bar
-            with open(destination, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        if show_progress and total_size > 0:
-                            downloaded = f.tell()
-                            percent = (downloaded / total_size) * 100
-                            print(f"\rDownloading: {percent:.1f}%", end="", flush=True)
-
-            if show_progress and total_size > 0:
-                print()  # New line after progress
-
-        logger.info("Downloaded to: %s", destination)
-
+                )
+            except ImportError:
+                progress = None
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with open(destination, "wb") as f:
+            for chunk in response.iter_content(chunk_size=1 << 16):
+                if chunk:
+                    f.write(chunk)
+                    if progress is not None:
+                        progress.update(len(chunk))
+        if progress is not None:
+            progress.close()
     except requests.exceptions.RequestException as e:
-        logger.error("Download failed: %s", str(e))
-        # Clean up partial download
-        if destination.exists():
-            destination.unlink()
-        raise DownloadError(f"Download failed: {str(e)}") from e
+        destination.unlink(missing_ok=True)
+        raise DownloadError(f"Download failed: {e}") from e
     except OSError as e:
-        logger.error("Failed to write file: %s", str(e))
-        raise DownloadError(f"Failed to write file: {str(e)}") from e
+        destination.unlink(missing_ok=True)
+        raise DownloadError(f"Failed to write file: {e}") from e
 
 
 def download_database(
     version: str | None = None, force: bool = False, show_progress: bool = True
 ) -> Path:
     """
-    Download the database from GitHub releases.
-
-    Similar to nltk.download(), this function downloads the database file
-    and caches it locally.
+    Download a release database into the cache and verify its checksum.
 
     Args:
-        version: Version to download (e.g., "v1.0.0"). If None, downloads latest.
-        force: If True, re-download even if already cached
-        show_progress: Whether to show download progress
+        version: Release to download (``"v3.1.0"`` or ``"3.1.0"``). Defaults to
+            ``INTERNACIA_DATA_VERSION`` if set, else the newest release with a supported
+            contract major.
+        force: Re-download even if the release is already cached.
+        show_progress: Show a progress bar (requires the ``progress`` extra).
 
     Returns:
-        Path to downloaded database file
+        Path to the cached ``internacia.duckdb``.
 
     Raises:
-        DownloadError: If download fails
-        VersionError: If version not found
+        DownloadError: If the download fails or the checksum does not match
+        VersionError: If the version is invalid or no compatible release exists
 
     Example:
         >>> from internacia import download_database
-        >>> db_path = download_database()  # Download latest
-        >>> db_path = download_database(version="v1.0.0")  # Download specific version
+        >>> db_path = download_database()
+        >>> db_path = download_database(version="v3.0.0")
     """
-    try:
-        # Get version info
-        if version:
-            logger.info("Downloading version: %s", version)
-            db_info = get_database_info(version)
-        else:
-            logger.info("Downloading latest version")
-            latest_version = get_latest_version()
-            db_info = get_database_info(latest_version)
-            version = db_info["version"]
-
-        # Determine cache path
-        cache_path = get_cached_database_path(version)
-
-        # Check if already exists
-        if cache_path.exists() and not force:
-            logger.info("Database already cached at: %s", cache_path)
-            return cache_path
-
-        # Download
-        download_url = db_info.get("download_url")
-        if not download_url:
-            raise DownloadError("No download URL found in release")
-
-        # Download to temporary file first
-        temp_path = cache_path.with_suffix(".duckdb.tmp")
-        _download_file(download_url, temp_path, show_progress=show_progress)
-
-        # Verify file exists and has content
-        if not temp_path.exists() or temp_path.stat().st_size == 0:
-            temp_path.unlink(missing_ok=True)
-            raise DownloadError("Downloaded file is empty or missing")
-
-        # Move to final location
-        if cache_path.exists():
-            cache_path.unlink()
-        shutil.move(str(temp_path), str(cache_path))
-
-        logger.info("Database downloaded successfully to: %s", cache_path)
+    version = version or os.getenv(Config.ENV_DATA_VERSION)
+    tag = release_tag(version) if version else get_latest_version()
+    cache_path = get_cached_database_path(tag)
+    if cache_path.exists() and not force:
+        logger.info("Database %s already cached at: %s", tag, cache_path)
         return cache_path
 
-    except (DownloadError, VersionError):
-        raise
-    except Exception as e:
-        logger.error("Unexpected error during download: %s", str(e))
-        raise DownloadError(f"Unexpected error during download: {str(e)}") from e
+    temp_path = cache_path.with_name(DB_FILE + ".tmp")
+    _download_file(
+        DOWNLOAD_URL.format(tag=tag, name=DB_FILE), temp_path, show_progress=show_progress
+    )
+    if temp_path.stat().st_size == 0:
+        temp_path.unlink(missing_ok=True)
+        raise DownloadError("Downloaded file is empty")
 
-
-def list_releases() -> list:
-    """
-    List all available releases and their database file status.
-
-    Returns:
-        List of dictionaries with release information:
-        - tag_name: str, release tag
-        - published_at: str, publication date
-        - has_database: bool, whether release has a .duckdb file
-        - asset_names: list, names of all assets in the release
-
-    Raises:
-        DownloadError: If unable to fetch releases
-    """
-    try:
-        logger.debug("Fetching releases from: %s", GITHUB_RELEASES_URL)
-        response = requests.get(
-            GITHUB_RELEASES_URL,
-            timeout=10,
-            headers={"Accept": "application/vnd.github.v3+json"},
-        )
-        response.raise_for_status()
-
-        releases_data = response.json()
-        releases = []
-
-        for release in releases_data:
-            assets = release.get("assets", [])
-            asset_names = [asset.get("name", "") for asset in assets]
-            has_database = any(name.endswith(".duckdb") for name in asset_names)
-
-            releases.append(
-                {
-                    "tag_name": release.get("tag_name", ""),
-                    "published_at": release.get("published_at", ""),
-                    "has_database": has_database,
-                    "asset_names": asset_names,
-                }
+    checksums = _fetch_checksums(tag)
+    if checksums is None:
+        logger.warning("Release %s has no %s; the download was not verified", tag, CHECKSUMS_FILE)
+    else:
+        expected = checksums.get(DB_FILE)
+        actual = _sha256(temp_path)
+        if expected != actual:
+            temp_path.unlink(missing_ok=True)
+            raise DownloadError(
+                f"{DB_FILE} from {tag} failed verification: sha256 {actual} != {expected}"
             )
 
-        return releases
-
-    except requests.exceptions.RequestException as e:
-        logger.error("Failed to fetch releases: %s", str(e))
-        raise DownloadError(f"Failed to fetch releases: {str(e)}") from e
+    shutil.move(str(temp_path), str(cache_path))
+    logger.info("Database %s downloaded to: %s", tag, cache_path)
+    return cache_path
 
 
 def check_for_updates() -> dict:
     """
-    Check if a newer database version is available.
+    Compare the newest cached release with the newest compatible release.
 
     Returns:
-        Dictionary with update information:
-        - has_update: bool, whether update is available
-        - current_version: str or None, current cached version
-        - latest_version: str, latest available version
-        - current_path: Path or None, path to current database
-        - latest_info: dict, information about latest release
+        ``has_update`` (bool), ``current_version`` (tag or None), ``latest_version`` (tag),
+        ``current_path`` (Path or None).
 
     Raises:
-        DownloadError: If unable to check for updates
+        DownloadError: If release information cannot be fetched
     """
-    try:
-        latest_version = get_latest_version()
-        latest_info = get_database_info(latest_version)
-
-        # Check for cached database
-        cached_path = get_cached_database_path()
-        current_version = None
-
-        if cached_path.exists():
-            # Try to determine version from cache
-            # For now, we'll check if latest is newer by comparing timestamps
-            # In a full implementation, we might store version metadata
-            current_version = "cached"
-
-        # For now, always suggest update if we can't determine current version
-        # In a full implementation, compare versions properly
-        has_update = True  # Conservative approach
-
-        return {
-            "has_update": has_update,
-            "current_version": current_version,
-            "latest_version": latest_version,
-            "current_path": cached_path if cached_path.exists() else None,
-            "latest_info": latest_info,
-        }
-
-    except Exception as e:
-        logger.error("Failed to check for updates: %s", str(e))
-        raise DownloadError(f"Failed to check for updates: {str(e)}") from e
+    latest = get_latest_version()
+    current = next(
+        (tag for tag in cached_versions() if parse_version(tag)[0] == SUPPORTED_CONTRACT_MAJOR),  # type: ignore[index]
+        None,
+    )
+    return {
+        "has_update": current is None or parse_version(latest) > parse_version(current),  # type: ignore[operator]
+        "current_version": current,
+        "latest_version": latest,
+        "current_path": get_cached_database_path(current) if current else None,
+    }

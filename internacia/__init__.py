@@ -6,7 +6,9 @@ international blocks, and fuzzy search across multiple languages.
 """
 
 from internacia.client import InternaciaClient
+from internacia.contract import SUPPORTED_CONTRACT_MAJOR, TESTED_CONTRACT
 from internacia.downloader import (
+    cached_versions,
     check_for_updates,
     download_database,
     get_cache_dir,
@@ -15,6 +17,7 @@ from internacia.downloader import (
     list_releases,
 )
 from internacia.exceptions import (
+    ContractError,
     DatabaseError,
     DownloadError,
     InternaciaError,
@@ -48,6 +51,10 @@ __all__ = [
     "ValidationError",
     "DownloadError",
     "VersionError",
+    "ContractError",
+    "SUPPORTED_CONTRACT_MAJOR",
+    "TESTED_CONTRACT",
+    "cached_versions",
     "Country",
     "Intblock",
     "SearchResult",

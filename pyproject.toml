@@ -83,5 +83,6 @@ disallow_untyped_defs = false
 testpaths = ["tests"]
 markers = [
     "integration: runs against a real internacia-db DuckDB file (set INTERNACIA_TEST_DB_PATH)",
+    "contract: portable data-contract suite run by internacia-db (set INTERNACIA_CONTRACT_DB_PATH)",
 ]
 
