@@ -208,3 +208,7 @@ __marimo__/
 
 # Integration test database (scripts/fetch_test_db.py)
 .test-data/
+
+# Editor workspaces and local AI/analysis reports
+*.code-workspace
+dev/docs/

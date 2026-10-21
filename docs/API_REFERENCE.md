@@ -615,7 +615,7 @@ Functions for downloading and managing the database.
 Download the database from GitHub releases.
 
 **Parameters:**
-- `version` (Optional[str]): Version string (e.g., "v1.0.0"). If `None`, downloads the latest version.
+- `version` (Optional[str]): Version string (e.g., "v3.0.0"). If `None`, downloads the latest version.
 - `force` (bool): Force re-download even if already cached (default: False)
 - `show_progress` (bool): Show download progress bar (default: True, requires `tqdm`)
 - `cache_dir` (Optional[Path]): Custom cache directory. If `None`, uses default cache location.
@@ -635,7 +635,7 @@ from internacia import download_database
 db_path = download_database()
 
 # Download specific version
-db_path = download_database(version="v1.0.0")
+db_path = download_database(version="v3.0.0")
 
 # Force re-download
 db_path = download_database(force=True)
@@ -648,7 +648,7 @@ db_path = download_database(force=True)
 Fetch the latest release version from GitHub.
 
 **Returns:**
-- `str`: Latest version string (e.g., "v1.0.0")
+- `str`: Latest version string (e.g., "v3.0.0")
 
 **Raises:**
 - `DownloadError`: If unable to fetch version information
@@ -749,7 +749,7 @@ from internacia import get_cached_database_path
 latest_path = get_cached_database_path()
 
 # Get specific version path
-version_path = get_cached_database_path(version="v1.0.0")
+version_path = get_cached_database_path(version="v3.0.0")
 ```
 
 ---

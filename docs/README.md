@@ -99,7 +99,7 @@ docs/
 
 - **Main README**: See the [main README](../README.md) for installation, setup, and overview
 - **Examples Directory**: See the [`examples/`](../examples/) directory for runnable example scripts
-- **GitHub Repository**: [https://github.com/commondataio/internacia-python](https://github.com/commondataio/internacia-python)
+- **GitHub Repository**: [https://github.com/datenoio/internacia-python](https://github.com/datenoio/internacia-python)
 
 ## Contributing
 
