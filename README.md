@@ -138,6 +138,29 @@ client.countries.get_by_timezone("Europe/Paris")
 client.countries.get_regions(); client.countries.get_region("ECS")
 ```
 
+
+### LLM tools
+
+`internacia.tools` turns the SDK into function-calling tools. Every public query method is a
+tool (`countries_get_by_code`, `memberships_get_by_intblock`, …) whose schema is generated from
+its signature and docstring, plus two composite tools, `country_lookup` and `intblock_lookup`.
+Passing a client fills `enum` lists (regions, statuses, block types, scope categories) from the
+connected data version.
+
+```python
+from internacia import InternaciaClient
+from internacia.tools import call_tool, openai_tools, tool_schemas
+
+client = InternaciaClient()
+tools = openai_tools(client)        # OpenAI "tools" format; tool_schemas() for plain JSON Schema
+
+# After the model returns a tool call:
+result = call_tool(client, "intblock_lookup", '{"member_country": "FR", "scope_category": "igo"}')
+```
+
+`call_tool` accepts the arguments as a dict or as the JSON string LLM APIs return, and returns
+JSON-serializable data.
+
 ## Quick Start
 
 ```python

@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the canonical views (with the same SQL on databases without them).
 - `InternaciaClient.close()` and context-manager support.
 - `tests/contract` covers the new methods.
+- `internacia.tools`: LLM function-calling schemas generated from the SDK's signatures and
+  docstrings (OpenAI and plain JSON Schema formats), enum lists from the connected database, and
+  `call_tool()` to execute tool calls. Replaces the hand-written `*_lookup.openai.json` files in
+  internacia-db.
 
 ### Changed
 - `download_database()` uses direct release download URLs (no GitHub API rate limit), resolves
