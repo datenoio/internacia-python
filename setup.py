@@ -18,8 +18,8 @@ setup(
     python_requires=">=3.8",
     packages=find_packages(),
     install_requires=[
-        "duckdb>=0.9.0",
-        "pandas>=2.0.0",
+        "duckdb>=1.5.4,<3",
+        "requests>=2.28.0",
     ],
     classifiers=[
         "Development Status :: 4 - Beta",

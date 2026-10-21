@@ -121,12 +121,11 @@ class IntblocksClient:
         Returns:
             List of block dictionaries
         """
-        # In DuckDB, when UNNESTing a list of structs, the result column is named 'unnest'
-        # and contains the struct. Access struct fields using unnest.field
         query = """
-            SELECT DISTINCT i.*
-            FROM intblocks i, UNNEST(i.includes) AS member
-            WHERE unnest.id = ?
+            SELECT i.* FROM intblocks i
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(i.includes) AS t(member) WHERE member.id = ?
+            )
         """
         results = self._db.execute_query_dict(query, (country_code.upper(),))
         return results
@@ -142,9 +141,10 @@ class IntblocksClient:
             List of block dictionaries
         """
         query = """
-            SELECT DISTINCT i.*
-            FROM intblocks i, UNNEST(i.acronyms) AS acr
-            WHERE UPPER(acr.value) = ?
+            SELECT i.* FROM intblocks i
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(i.acronyms) AS t(acr) WHERE UPPER(acr.value) = ?
+            )
         """
         results = self._db.execute_query_dict(query, (acronym.upper(),))
         return results
@@ -177,9 +177,10 @@ class IntblocksClient:
             List of block dictionaries
         """
         query = """
-            SELECT DISTINCT i.*
-            FROM intblocks i, UNNEST(i.topics) AS topic
-            WHERE topic.key = ?
+            SELECT i.* FROM intblocks i
+            WHERE EXISTS (
+                SELECT 1 FROM UNNEST(i.topics) AS t(topic) WHERE topic.key = ?
+            )
         """
         results = self._db.execute_query_dict(query, (topic_key.lower(),))
         return results

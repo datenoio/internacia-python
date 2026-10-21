@@ -6,7 +6,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 - 🌍 **Countries Data**: Access comprehensive country information including codes, names, currencies, languages, and more
 - 🏛️ **International Blocks**: Query international organizations, alliances, and unions
-- 🔍 **Fuzzy Search**: Multi-language search supporting partial matches across names, codes, acronyms, and translations
+- 🔍 **Fuzzy Search**: Multi-language search supporting partial matches across names, codes, acronyms, and names in other languages
 - 🚀 **Thread-Safe**: Built on DuckDB with thread-safe connection handling
 - 🌐 **Multi-Language**: Search works across all languages supported in the dataset
 - ⚡ **Fast**: Leverages DuckDB for high-performance queries
@@ -252,7 +252,7 @@ The fuzzy search function searches across countries and international blocks, su
 - Country names (in any language via native_names)
 - Country codes (ISO 3166-1 alpha-2, alpha-3, numeric)
 - International block names
-- Block translations (in any language)
+- Block names in other languages (`other_names`)
 - Block acronyms (in any language)
 - Block IDs
 - Block tags
@@ -366,7 +366,7 @@ Available types:
 - `Country`: Country data structure
 - `Intblock`: International block data structure
 - `SearchResult`: Search result with type indicator
-- Supporting types: `CapitalCity`, `Region`, `IncomeLevel`, `Language`, `Currency`, `NativeName`, `Translation`, `Acronym`, `Topic`, `Member`
+- Supporting types: `CapitalCity`, `Region`, `IncomeLevel`, `Language`, `Currency`, `NativeName`, `OtherName`, `Acronym`, `Topic`, `Member`
 
 ### Error Handling
 
@@ -430,11 +430,12 @@ Exception types:
 - `name`: Name of the block
 - `blocktype`: List of types (e.g., ["economic", "political"])
 - `status`: Status ("formal", "informal", "de-facto")
-- `translations`: List of `{lang, name}`
+- `other_names`: List of `{id, name}`, where `id` is the language code
 - `acronyms`: List of `{lang, value}`
 - `includes`: List of member countries `{id, name, type, status, ...}`
 - `founded`: Foundation year/date
 - `geographic_scope`: Scope ("global", "regional", "sub-regional")
+- `scope_category`: Scope category (an open string; new values can appear in any data release)
 - `tags`: List of classification tags
 - `topics`: List of `{key, name}`
 - And more...

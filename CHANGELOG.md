@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Compatibility with internacia-db v3: every public method now works against the v3.0.0 DuckDB on duckdb 1.5.4 and 2.x.
+  - Nested-list filters (`get_by_currency`, `get_by_language`, `get_by_member`, `get_by_acronym`, `get_by_topic` and search) use the version-portable `EXISTS (SELECT 1 FROM UNNEST(col) AS t(x) WHERE x.field = ?)` form.
+  - Block search uses `other_names` instead of the `translations` column, which internacia-db removed in 1.6.0.
+  - Multilingual country search uses `map_values(native_names)` and matches both `common` and `official` names. Previously it failed silently and returned nothing.
+  - A failing search query now raises `DatabaseError` instead of being logged and skipped.
+- Results are plain Python types (`list`, `dict`, `None`) and JSON-serializable. Rows come from `fetchall()` and `cursor.description`, not pandas.
+
+### Changed
+
+- `duckdb>=1.5.4,<3` (was `>=0.9.0`; 0.9.x cannot open the v3 file).
+- Removed the `pandas` dependency.
+- Model fields are typed `Optional`, because every internacia-db column is nullable. `scope_category` and other enum-like columns are open strings.
+- `Intblock` gains `other_names` and `scope_category`; `Country` gains `other_names`; `Member` gains `joined`, `left`, `role` and `note`.
+
+### Removed
+
+- `Intblock.translations` and the `Translation` type. Use `other_names` and `OtherName`.
+
 ## [0.2.0] - 2025-12-20
 
 Initial release of Internacia Python SDK

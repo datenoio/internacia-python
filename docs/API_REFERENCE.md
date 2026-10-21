@@ -527,7 +527,7 @@ This function searches across:
 - Country names (in any language via native_names)
 - Country codes (ISO 3166-1 alpha-2, alpha-3, numeric)
 - International block names
-- Block translations (in any language)
+- Block names in other languages (`other_names`)
 - Block acronyms (in any language)
 - Block IDs
 - Block tags
@@ -795,11 +795,12 @@ International block data structure.
 - `name` (str): Name of the block
 - `blocktype` (List[str]): List of types (e.g., ["economic", "political"])
 - `status` (str): Status ("formal", "informal", "de-facto")
-- `translations` (List[Translation]): List of translations in different languages
+- `other_names` (Optional[List[OtherName]]): Names in other languages
 - `acronyms` (List[Acronym]): List of acronyms in different languages
 - `includes` (List[Member]): List of member countries
 - `founded` (Optional[str]): Foundation year/date
 - `geographic_scope` (Optional[str]): Scope ("global", "regional", "sub-regional")
+- `scope_category` (Optional[str]): Scope category. This is an open string: new values can appear in any MINOR data release, so do not treat it as a closed enum.
 - `tags` (List[str]): List of classification tags
 - `topics` (List[Topic]): List of topics
 
@@ -861,9 +862,9 @@ for result in results:
 - `official` (str): Official native name
 - `common` (str): Common native name
 
-#### Translation
-- `lang` (str): Language code
-- `name` (str): Translated name
+#### OtherName
+- `id` (str): Language code
+- `name` (str): Name in that language
 
 #### Acronym
 - `lang` (str): Language code
@@ -977,7 +978,7 @@ All functions return pure Python types:
 - **Dictionaries**: All data structures are returned as Python dictionaries (TypedDict for type hints)
 - **Lists**: Collections are returned as Python lists
 - **Integers**: Count methods return Python integers
-- **None**: Optional return values use Python `None`
+- **None**: Optional return values use Python `None`. Any field of a returned record can be `None`, including nested lists such as `currencies` and `languages`; iterate with `country.get("currencies") or []`.
 - **Path**: Path-related functions return `pathlib.Path` objects
 
 **No numpy arrays or pandas DataFrames are returned** - all data is converted to standard Python types before being returned to users.
