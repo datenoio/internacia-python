@@ -133,3 +133,71 @@ class SearchResult(TypedDict, total=False):
 
     type: str  # 'country' or 'intblock'
     # All fields from Country or Intblock depending on type
+
+
+class Membership(TypedDict, total=False):
+    """One membership edge (``memberships`` table / ``current_memberships`` view)."""
+
+    intblock_id: str
+    country_code: str
+    include_type: str | None
+    status: str | None
+    joined: str | None
+    left: str | None
+
+
+class Blocktype(TypedDict, total=False):
+    """A block type from the ``blocktypes`` taxonomy."""
+
+    id: str
+    name: str | None
+    other_names: list[dict[str, str | None]] | None
+
+
+class IdResolution(TypedDict):
+    """Result of resolving a possibly retired or renamed identifier.
+
+    ``status`` is ``current`` (``id`` exists), an alias reason (``renamed``, ``merged``,
+    ``retired``; ``id`` is the replacement or None for ``retired``), or ``unknown``.
+    ``disambiguated`` is set when the input is a current id that previously named a
+    different entity, which moved to that id.
+    """
+
+    input: str
+    id: str | None
+    status: str
+    since: str | None
+    note: str | None
+    disambiguated: str | None
+
+
+class CurrencyEntry(TypedDict):
+    """A currency with the number of countries using it."""
+
+    code: str
+    name: str | None
+    symbol: str | None
+    country_count: int
+
+
+class LanguageEntry(TypedDict):
+    """A language (ISO 639-3) with the number of countries listing it."""
+
+    code: str
+    name: str | None
+    country_count: int
+
+
+class TimezoneEntry(TypedDict):
+    """An IANA time zone with the number of countries using it."""
+
+    timezone: str
+    country_count: int
+
+
+class RegionEntry(TypedDict):
+    """A World Bank region with the number of countries in it."""
+
+    id: str
+    value: str | None
+    country_count: int

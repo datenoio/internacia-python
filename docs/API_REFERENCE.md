@@ -523,6 +523,38 @@ print(f"Total blocks: {total}")
 
 ---
 
+## MembershipsClient
+
+`client.memberships`: membership edges (`intblock_id`, `country_code`, `include_type`,
+`status`, `joined`, `left`). With `current_only=True` (the default) edges follow the
+internacia-db `current_memberships` view: not `former_member`, no `left` date, and the block
+is neither historical nor dissolved. All participation statuses are kept.
+
+- `get_by_intblock(block_id, current_only=True) -> list[Membership]`
+- `get_by_country(country_code, current_only=True) -> list[Membership]`
+- `is_member(country_code, block_id, current_only=True) -> bool`
+
+## BlocktypesClient
+
+`client.blocktypes`: `get_all() -> list[Blocktype]`, `get_by_id(id) -> Blocktype | None`.
+
+## Identifier resolution and catalogs
+
+- `client.intblocks.resolve_id(block_id) -> IdResolution` and
+  `client.countries.resolve_code(code) -> IdResolution`: `{"input", "id", "status", "since",
+  "note", "disambiguated"}` with `status` `current`, `renamed`, `merged`, `retired` or
+  `unknown`. Needs the alias tables in `internacia.duckdb` (releases after 3.0.0).
+- `client.intblocks.get_by_member(country_code, current_only=False)`.
+- `client.countries.get_currencies()`, `get_currency(code)`, `get_country_currencies(cc)`;
+  `get_languages()`, `get_language(code)`, `get_country_languages(cc)`; `get_timezones()`,
+  `get_country_timezones(cc)`, `get_by_timezone(tz)`; `get_regions()`, `get_region(id)`.
+  Catalog entries carry `country_count`.
+
+## Connection lifecycle
+
+The client holds one read-only DuckDB connection, opened on first use. `client.close()`
+closes it (the next query reopens it); `with InternaciaClient() as client:` closes it on exit.
+
 ## SearchClient
 
 Client for searching countries and international blocks.

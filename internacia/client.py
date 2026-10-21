@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from internacia import contract
+from internacia.blocktypes import BlocktypesClient
 from internacia.config import Config
 from internacia.countries import CountriesClient
 from internacia.database import DatabaseManager
 from internacia.exceptions import ContractError, DatabaseError
 from internacia.intblocks import IntblocksClient
+from internacia.memberships import MembershipsClient
 from internacia.search import SearchClient
 
 logger = logging.getLogger(__name__)
@@ -79,7 +81,19 @@ class InternaciaClient:
             contract.check_contract(self.meta())
         self.countries = CountriesClient(self._db_manager)
         self.intblocks = IntblocksClient(self._db_manager)
+        self.memberships = MembershipsClient(self._db_manager)
+        self.blocktypes = BlocktypesClient(self._db_manager)
         self.search = SearchClient(self._db_manager)
+
+    def close(self) -> None:
+        """Close the database connection (it reopens on the next query)."""
+        self._db_manager.close()
+
+    def __enter__(self) -> "InternaciaClient":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
 
     def meta(self) -> dict[str, Any]:
         """

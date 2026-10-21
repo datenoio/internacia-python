@@ -3,9 +3,11 @@
 import logging
 from typing import cast
 
+from internacia.aliases import resolve
 from internacia.database import DatabaseManager
 from internacia.exceptions import ValidationError
-from internacia.models import Intblock
+from internacia.models import IdResolution, Intblock
+from internacia.views import relation
 
 logger = logging.getLogger(__name__)
 
@@ -112,24 +114,51 @@ class IntblocksClient:
         results = cast(list[Intblock], self._db.execute_query_dict(query, (scope.lower(),)))
         return results
 
-    def get_by_member(self, country_code: str) -> list[Intblock]:
+    def get_by_member(self, country_code: str, current_only: bool = False) -> list[Intblock]:
         """
-        Get blocks that include a specific country as a member.
+        Get blocks that list a country in ``includes``.
 
         Args:
             country_code: Two-letter country code (e.g., "US", "FR", "DE")
+            current_only: Only blocks where the membership is current (see
+                ``client.memberships``); by default former memberships are included.
 
         Returns:
             List of block dictionaries
         """
-        query = """
-            SELECT i.* FROM intblocks i
-            WHERE EXISTS (
-                SELECT 1 FROM UNNEST(i.includes) AS t(member) WHERE member.id = ?
-            )
-        """
+        if current_only:
+            query = f"""
+                SELECT i.* FROM intblocks i
+                WHERE i.id IN (
+                    SELECT intblock_id FROM {relation(self._db, "current_memberships")}
+                    WHERE country_code = ?
+                )
+            """
+        else:
+            query = """
+                SELECT i.* FROM intblocks i
+                WHERE EXISTS (
+                    SELECT 1 FROM UNNEST(i.includes) AS t(member) WHERE member.id = ?
+                )
+            """
         results = cast(list[Intblock], self._db.execute_query_dict(query, (country_code.upper(),)))
         return results
+
+    def resolve_id(self, block_id: str) -> IdResolution:
+        """
+        Resolve a stored block id that may have been retired, renamed or merged.
+
+        Returns:
+            ``{"input", "id", "status", "since", "note", "disambiguated"}``: ``status`` is
+            ``current``, an alias reason (``renamed``, ``merged``, ``retired``) with ``id``
+            the replacement (None for ``retired``), or ``unknown``. ``disambiguated`` names
+            the id an entity moved to when ``block_id`` is current but used to mean that
+            entity.
+
+        Example:
+            >>> client.intblocks.resolve_id("USAN")["id"]  # "UNASUR"
+        """
+        return resolve(self._db, "intblocks", "id", "intblocks_aliases", block_id.upper())
 
     def get_by_acronym(self, acronym: str) -> list[Intblock]:
         """

@@ -5,6 +5,8 @@ A Python SDK for accessing internacia-db data with support for countries,
 international blocks, and fuzzy search across multiple languages.
 """
 
+import logging
+
 from internacia.client import InternaciaClient
 from internacia.contract import SUPPORTED_CONTRACT_MAJOR, TESTED_CONTRACT
 from internacia.downloader import (
@@ -27,17 +29,24 @@ from internacia.exceptions import (
 )
 from internacia.models import (
     Acronym,
+    Blocktype,
     CapitalCity,
     Country,
     Currency,
+    CurrencyEntry,
+    IdResolution,
     IncomeLevel,
     Intblock,
     Language,
+    LanguageEntry,
     Member,
+    Membership,
     NativeName,
     OtherName,
     Region,
+    RegionEntry,
     SearchResult,
+    TimezoneEntry,
     Topic,
 )
 from internacia.version import __version__
@@ -68,6 +77,13 @@ __all__ = [
     "Acronym",
     "Topic",
     "Member",
+    "Membership",
+    "Blocktype",
+    "IdResolution",
+    "CurrencyEntry",
+    "LanguageEntry",
+    "TimezoneEntry",
+    "RegionEntry",
     "download_database",
     "get_latest_version",
     "check_for_updates",
@@ -75,3 +91,5 @@ __all__ = [
     "get_cache_dir",
     "get_cached_database_path",
 ]
+
+logging.getLogger(__name__).addHandler(logging.NullHandler())

@@ -1,6 +1,7 @@
-"""Thread-safe DuckDB connection manager for internacia SDK."""
+"""DuckDB connection manager for internacia SDK: one read-only connection per client."""
 
 import logging
+import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
@@ -15,10 +16,10 @@ logger = logging.getLogger(__name__)
 
 class DatabaseManager:
     """
-    Thread-safe DuckDB connection manager.
+    Holds one read-only DuckDB connection, opened on first use.
 
-    DuckDB read-only connections are thread-safe for concurrent reads.
-    Each query gets its own connection which is closed after use.
+    Each query runs on its own cursor (``connection.cursor()``), which DuckDB documents as
+    the way to use one database from several threads.
     """
 
     def __init__(self, db_path: Path):
@@ -29,7 +30,7 @@ class DatabaseManager:
             db_path: Path to the DuckDB database file
 
         Raises:
-            DatabaseError: If the database file doesn't exist or cannot be accessed
+            DatabaseError: If the database file doesn't exist
         """
         self.db_path = Path(db_path)
         if not self.db_path.exists():
@@ -38,30 +39,48 @@ class DatabaseManager:
                 f"Database file not found: {self.db_path}. "
                 "Please ensure the internacia-db dataset has been built."
             )
+        self._connection: duckdb.DuckDBPyConnection | None = None
+        self._lock = threading.Lock()
+        self._relations: set[str] | None = None
         logger.debug("DatabaseManager initialized with path: %s", self.db_path)
+
+    def _connect(self) -> duckdb.DuckDBPyConnection:
+        with self._lock:
+            if self._connection is None:
+                logger.debug("Opening read-only connection to %s", self.db_path)
+                self._connection = duckdb.connect(str(self.db_path), read_only=True)
+            return self._connection
 
     @contextmanager
     def get_connection(self) -> Generator[duckdb.DuckDBPyConnection, None, None]:
         """
-        Get a thread-safe read-only connection to DuckDB.
-
-        Yields:
-            DuckDB connection object
+        Yield a cursor on the shared read-only connection; the cursor is closed afterwards.
 
         Example:
             >>> with db_manager.get_connection() as conn:
             ...     result = conn.execute("SELECT * FROM countries LIMIT 1").fetchall()
         """
-        conn = None
+        cursor = self._connect().cursor()
         try:
-            # Connect in read-only mode for thread safety
-            logger.debug("Opening database connection")
-            conn = duckdb.connect(str(self.db_path), read_only=True)
-            yield conn
+            yield cursor
         finally:
-            if conn:
-                logger.debug("Closing database connection")
-                conn.close()
+            cursor.close()
+
+    def close(self) -> None:
+        """Close the shared connection; the next query opens a new one."""
+        with self._lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
+
+    def has_relation(self, name: str) -> bool:
+        """Whether a table or view called ``name`` exists (cached per manager)."""
+        if self._relations is None:
+            rows = self.execute_query(
+                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+            )
+            self._relations = {row[0] for row in rows}
+        return name in self._relations
 
     def execute_query(self, query: str, parameters: tuple | None = None) -> list:
         """

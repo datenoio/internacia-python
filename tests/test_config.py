@@ -107,31 +107,22 @@ class TestConfigGetLogLevel:
 class TestConfigSetupLogging:
     """Test setup_logging method."""
 
-    def test_setup_logging_creates_handler(self):
-        """Test that setup_logging creates a handler."""
+    def test_setup_logging_adds_no_handlers(self, monkeypatch):
+        """A library must leave handlers to the application."""
+        monkeypatch.delenv("INTERNACIA_LOG_LEVEL", raising=False)
         logger = Config.setup_logging("test_logger")
-        assert logger is not None
-        assert len(logger.handlers) > 0
+        assert logger.handlers == []
+        assert logger.level == logging.NOTSET
 
-    def test_setup_logging_does_not_duplicate_handlers(self):
-        """Test that setup_logging doesn't duplicate handlers."""
-        logger1 = Config.setup_logging("test_logger_2")
-        handler_count_1 = len(logger1.handlers)
-
-        logger2 = Config.setup_logging("test_logger_2")
-        handler_count_2 = len(logger2.handlers)
-
-        # Should not add duplicate handlers
-        assert handler_count_1 == handler_count_2
-
-    def test_setup_logging_sets_level(self, monkeypatch):
-        """Test that setup_logging sets the log level."""
+    def test_setup_logging_sets_level_from_env(self, monkeypatch):
+        """INTERNACIA_LOG_LEVEL sets the SDK logger level."""
         monkeypatch.setenv("INTERNACIA_LOG_LEVEL", "DEBUG")
         logger = Config.setup_logging("test_logger_3")
         assert logger.level == logging.DEBUG
+        assert logger.handlers == []
 
-    def test_setup_logging_formatter(self):
-        """Test that setup_logging sets a formatter."""
-        logger = Config.setup_logging("test_logger_4")
-        handler = logger.handlers[0]
-        assert handler.formatter is not None
+    def test_package_logger_has_null_handler(self):
+        import internacia  # noqa: F401
+
+        handlers = logging.getLogger("internacia").handlers
+        assert any(isinstance(h, logging.NullHandler) for h in handlers)

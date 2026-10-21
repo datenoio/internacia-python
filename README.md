@@ -16,6 +16,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 | internacia (SDK) | internacia-db data | duckdb | Python |
 |---|---|---|---|
+| 0.4.x | 3.x (contract 3.x; tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.3.x | 3.x (tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.2.0 | 1.x–2.x; broken on 3.x | `>=0.9.0` | `>=3.8` (declared) |
 
@@ -96,6 +97,46 @@ SDK release supports contract **3.x** and was tested against **3.0**:
 - `InternaciaClient(check_contract=False)` skips the check.
 - Enum-like fields (`status`, `scope_category`, `geographic_scope`, …) are open strings: new
   values can appear in any MINOR release.
+
+
+### Memberships, block types and retired IDs
+
+```python
+with InternaciaClient() as client:   # closes the connection on exit
+    # Current membership edges (no former members, no left date, block not dissolved)
+    nato = client.memberships.get_by_intblock("NATO")
+    full = [m["country_code"] for m in nato if m["status"] in ("member", "founding_member")]
+    history = client.memberships.get_by_country("US", current_only=False)
+    client.memberships.is_member("US", "NAFTA")             # False (left in 2020)
+
+    client.intblocks.get_by_member("US", current_only=True)  # blocks, current only
+    client.blocktypes.get_all()                              # the blocktype taxonomy
+
+    client.intblocks.resolve_id("USAN")    # {"id": "UNASUR", "status": "merged", ...}
+    client.countries.resolve_code("KV")    # {"id": "XK", "status": "renamed", ...}
+```
+
+`resolve_id` returns `status` `current`, an alias reason (`renamed`, `merged`, `retired`) with
+the replacement `id` (None when retired), or `unknown`. `disambiguated` is set when the id is
+current but used to name another entity. Alias resolution needs an internacia-db release that
+ships the alias tables inside `internacia.duckdb` (after 3.0.0); with 3.0.0 only `current` and
+`unknown` are reported.
+
+### Derived catalogs
+
+Currencies, languages, time zones and regions come from the canonical views of the data
+contract (or the same SQL on databases built before the views existed). Countries with no
+currencies, languages or time zones simply have no rows.
+
+```python
+client.countries.get_currencies()               # [{"code", "name", "symbol", "country_count"}]
+client.countries.get_currency("EUR")
+client.countries.get_country_currencies("CH")   # [{"code": "CHF", ...}]
+client.countries.get_languages(); client.countries.get_country_languages("BE")
+client.countries.get_timezones(); client.countries.get_country_timezones("RU")
+client.countries.get_by_timezone("Europe/Paris")
+client.countries.get_regions(); client.countries.get_region("ECS")
+```
 
 ## Quick Start
 
@@ -294,30 +335,19 @@ The SDK will automatically use these environment variables if set. Priority orde
 
 #### Logging
 
-The SDK includes comprehensive logging for debugging and monitoring:
+The SDK logs through the standard `logging` module under the `internacia` logger and never
+attaches handlers of its own (the package logger has a `NullHandler`). Configure output in
+your application:
 
 ```python
 import logging
-import os
 
-# Set log level via environment variable
-os.environ["INTERNACIA_LOG_LEVEL"] = "DEBUG"
-
-from internacia import InternaciaClient
-
-# Logging is automatically configured on client initialization
-client = InternaciaClient()
-
-# Or configure logging programmatically
-logging.getLogger("internacia").setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+logging.getLogger("internacia").setLevel(logging.DEBUG)  # queries and row counts
 ```
 
-Log levels:
-- `DEBUG`: Detailed information for debugging (queries, results)
-- `INFO`: General informational messages
-- `WARNING`: Warning messages (default)
-- `ERROR`: Error messages only
-- `CRITICAL`: Critical errors only
+`INTERNACIA_LOG_LEVEL` (`DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`) sets the level of the
+`internacia` logger when a client is created.
 
 ### Type Hints
 
