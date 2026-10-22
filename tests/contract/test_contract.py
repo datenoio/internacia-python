@@ -118,3 +118,19 @@ def test_unknown_open_enum_values_are_accepted(client: InternaciaClient) -> None
     assert client.intblocks.get_by_status("not-a-status-yet") == []
     assert client.intblocks.get_by_geographic_scope("not-a-scope-yet") == []
     assert client.intblocks.get_by_blocktype("not-a-blocktype-yet") == []
+
+
+def test_v3_model(client: InternaciaClient) -> None:
+    """Memberships, blocktypes and derived catalogs (views or their SQL fallback)."""
+    nato = client.memberships.get_by_intblock("NATO")
+    assert "FR" in {m["country_code"] for m in nato}
+    assert client.memberships.get_by_country("FR", current_only=False)
+    assert client.blocktypes.get_by_id("economic")
+    assert client.countries.get_currency("EUR")
+    assert client.countries.get_language("fra")
+    assert client.countries.get_country_timezones("FR")
+    assert client.countries.get_region("ECS")
+    assert client.intblocks.resolve_id("EU")["status"] == "current"
+    assert client.countries.resolve_code("FR")["status"] == "current"
+    for rows in (nato, client.countries.get_currencies(), client.blocktypes.get_all()):
+        assert_plain(rows)

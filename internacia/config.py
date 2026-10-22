@@ -72,22 +72,15 @@ class Config:
     @classmethod
     def setup_logging(cls, logger_name: str = "internacia") -> logging.Logger:
         """
-        Set up logging for the SDK.
+        Apply ``INTERNACIA_LOG_LEVEL`` to the SDK logger, if it is set.
 
-        Args:
-            logger_name: Name for the logger
+        The SDK never attaches handlers: configure output with ``logging.basicConfig()`` or
+        your application's logging setup. The package logger has a ``NullHandler``.
 
         Returns:
-            Configured logger instance
+            The SDK logger
         """
         logger = logging.getLogger(logger_name)
-
-        # Only configure if not already configured
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+        if os.getenv(cls.ENV_LOG_LEVEL):
             logger.setLevel(cls.get_log_level())
-
         return logger

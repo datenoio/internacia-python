@@ -26,6 +26,7 @@ def test_database_manager_get_connection(mock_db_path):
     """Test database connection context manager."""
     with patch("internacia.database.duckdb") as mock_duckdb:
         mock_conn = MagicMock()
+        mock_conn.cursor.return_value = mock_conn
         mock_duckdb.connect.return_value = mock_conn
 
         manager = DatabaseManager(mock_db_path)

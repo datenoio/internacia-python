@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - Unreleased
+
 ### Added
 - `InternaciaClient.meta()`: version, `contract_version`, build identity and per-dataset row
   counts and schema hashes from `_meta`.
@@ -16,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InternaciaClient(data_version=...)` and `INTERNACIA_DATA_VERSION` pin a cached release;
   `cached_versions()` lists cached releases newest first.
 - `tests/contract/`: portable data-contract suite that internacia-db runs against fresh builds.
+- `client.memberships`: current or all membership edges by block or country, and
+  `is_member()`. "Current" follows the internacia-db `current_memberships` view.
+- `client.intblocks.get_by_member(..., current_only=True)`.
+- `client.blocktypes`: the blocktype taxonomy.
+- `client.intblocks.resolve_id()` and `client.countries.resolve_code()` resolve retired,
+  renamed and merged identifiers through the alias tables in `internacia.duckdb`.
+- Derived catalogs on `client.countries`: currencies, languages, time zones and regions, from
+  the canonical views (with the same SQL on databases without them).
+- `InternaciaClient.close()` and context-manager support.
+- `tests/contract` covers the new methods.
 
 ### Changed
 - `download_database()` uses direct release download URLs (no GitHub API rate limit), resolves
@@ -25,6 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The cache is resolved by semantic version (`~/.internacia/<tag>/`), not by directory order.
 - `check_for_updates()` compares the newest cached release with the latest release instead of
   always reporting an update; `list_releases()` sends `GITHUB_TOKEN` when set.
+- One read-only DuckDB connection per client (a cursor per query) instead of one connection per
+  query.
+- The SDK no longer attaches logging handlers; `INTERNACIA_LOG_LEVEL` only sets the level.
 
 ### Removed
 - The sibling `../internacia-db/data/datasets/internacia.duckdb` fallback and

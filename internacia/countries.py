@@ -3,9 +3,20 @@
 import logging
 from typing import cast
 
+from internacia.aliases import resolve
 from internacia.database import DatabaseManager
 from internacia.exceptions import ValidationError
-from internacia.models import Country
+from internacia.models import (
+    Country,
+    Currency,
+    CurrencyEntry,
+    IdResolution,
+    Language,
+    LanguageEntry,
+    RegionEntry,
+    TimezoneEntry,
+)
+from internacia.views import relation
 
 logger = logging.getLogger(__name__)
 
@@ -242,3 +253,102 @@ class CountriesClient:
         query = "SELECT COUNT(*) as count FROM countries"
         result = self._db.execute_query_dict(query)
         return int(result[0]["count"]) if result else 0
+
+    def resolve_code(self, code: str) -> IdResolution:
+        """
+        Resolve a stored country code that may have been renamed (e.g. ``KV`` → ``XK``).
+
+        See ``IntblocksClient.resolve_id`` for the result fields.
+        """
+        return resolve(self._db, "countries", "code", "countries_aliases", code.upper())
+
+    def get_currencies(self) -> list[CurrencyEntry]:
+        """All currencies used by countries, with ``country_count``, ordered by code."""
+        query = f"""
+            SELECT currency_code AS code, min(currency_name) AS name,
+                   min(currency_symbol) AS symbol, count(*) AS country_count
+            FROM {relation(self._db, "country_currencies")}
+            GROUP BY currency_code ORDER BY currency_code
+        """
+        return cast(list[CurrencyEntry], self._db.execute_query_dict(query))
+
+    def get_currency(self, currency_code: str) -> CurrencyEntry | None:
+        """One currency by ISO 4217 code, or None."""
+        code = currency_code.upper()
+        return next((c for c in self.get_currencies() if c["code"] == code), None)
+
+    def get_country_currencies(self, country_code: str) -> list[Currency]:
+        """Currencies of one country (empty if it has none or does not exist)."""
+        query = f"""
+            SELECT currency_code AS code, currency_name AS name, currency_symbol AS symbol
+            FROM {relation(self._db, "country_currencies")}
+            WHERE country_code = ? ORDER BY currency_code
+        """
+        return cast(list[Currency], self._db.execute_query_dict(query, (country_code.upper(),)))
+
+    def get_languages(self) -> list[LanguageEntry]:
+        """All languages listed for countries, with ``country_count``, ordered by code."""
+        query = f"""
+            SELECT language_code AS code, min(language_name) AS name,
+                   count(*) AS country_count
+            FROM {relation(self._db, "country_languages")}
+            GROUP BY language_code ORDER BY language_code
+        """
+        return cast(list[LanguageEntry], self._db.execute_query_dict(query))
+
+    def get_language(self, language_code: str) -> LanguageEntry | None:
+        """One language by ISO 639-3 code, or None."""
+        code = language_code.lower()
+        return next((lang for lang in self.get_languages() if lang["code"] == code), None)
+
+    def get_country_languages(self, country_code: str) -> list[Language]:
+        """Languages of one country (empty if it has none or does not exist)."""
+        query = f"""
+            SELECT language_code AS code, language_name AS name, official
+            FROM {relation(self._db, "country_languages")}
+            WHERE country_code = ? ORDER BY language_code
+        """
+        return cast(list[Language], self._db.execute_query_dict(query, (country_code.upper(),)))
+
+    def get_timezones(self) -> list[TimezoneEntry]:
+        """All IANA time zones used by countries, with ``country_count``."""
+        query = f"""
+            SELECT timezone, count(*) AS country_count
+            FROM {relation(self._db, "country_timezones")}
+            GROUP BY timezone ORDER BY timezone
+        """
+        return cast(list[TimezoneEntry], self._db.execute_query_dict(query))
+
+    def get_country_timezones(self, country_code: str) -> list[str]:
+        """Time zones of one country (empty if it has none or does not exist)."""
+        query = f"""
+            SELECT timezone FROM {relation(self._db, "country_timezones")}
+            WHERE country_code = ? ORDER BY timezone
+        """
+        return [row[0] for row in self._db.execute_query(query, (country_code.upper(),))]
+
+    def get_by_timezone(self, timezone: str) -> list[Country]:
+        """Countries that use an IANA time zone (exact, case-sensitive name)."""
+        query = f"""
+            SELECT c.* FROM countries c
+            WHERE c.code IN (
+                SELECT country_code FROM {relation(self._db, "country_timezones")}
+                WHERE timezone = ?
+            )
+            ORDER BY c.code
+        """
+        return cast(list[Country], self._db.execute_query_dict(query, (timezone,)))
+
+    def get_regions(self) -> list[RegionEntry]:
+        """World Bank regions with ``country_count``, ordered by id."""
+        query = """
+            SELECT region.id AS id, min(region.value) AS value, count(*) AS country_count
+            FROM countries WHERE region.id IS NOT NULL
+            GROUP BY region.id ORDER BY region.id
+        """
+        return cast(list[RegionEntry], self._db.execute_query_dict(query))
+
+    def get_region(self, region_id: str) -> RegionEntry | None:
+        """One World Bank region by id (e.g. ``ECS``), or None."""
+        code = region_id.upper()
+        return next((r for r in self.get_regions() if r["id"] == code), None)

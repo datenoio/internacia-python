@@ -16,6 +16,7 @@ class TestDatabaseManagerExecuteQuery:
         # Create a real DuckDB connection for this test
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.return_value.fetchall.return_value = [("US", "United States")]
             mock_duckdb.connect.return_value = mock_conn
 
@@ -30,6 +31,7 @@ class TestDatabaseManagerExecuteQuery:
         """Test execute_query with parameters."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.return_value.fetchall.return_value = [("US",)]
             mock_duckdb.connect.return_value = mock_conn
 
@@ -45,6 +47,7 @@ class TestDatabaseManagerExecuteQuery:
         """Test execute_query error handling."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.side_effect = Exception("SQL syntax error")
             mock_duckdb.connect.return_value = mock_conn
 
@@ -64,6 +67,7 @@ class TestDatabaseManagerExecuteQueryDict:
         """Test execute_query_dict without parameters."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.return_value.description = [("code",), ("name",)]
             mock_conn.execute.return_value.fetchall.return_value = [("US", "United States")]
             mock_duckdb.connect.return_value = mock_conn
@@ -81,6 +85,7 @@ class TestDatabaseManagerExecuteQueryDict:
         """Test execute_query_dict with parameters."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.return_value.description = [("code",)]
             mock_conn.execute.return_value.fetchall.return_value = [("US",)]
             mock_duckdb.connect.return_value = mock_conn
@@ -100,6 +105,7 @@ class TestDatabaseManagerExecuteQueryDict:
         """Test execute_query_dict error handling."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.side_effect = Exception("SQL syntax error")
             mock_duckdb.connect.return_value = mock_conn
 
@@ -115,6 +121,7 @@ class TestDatabaseManagerExecuteQueryDict:
         """Test execute_query_dict with empty result."""
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
+            mock_conn.cursor.return_value = mock_conn
             mock_conn.execute.return_value.description = [("code",)]
             mock_conn.execute.return_value.fetchall.return_value = []
             mock_duckdb.connect.return_value = mock_conn
@@ -126,45 +133,52 @@ class TestDatabaseManagerExecuteQueryDict:
 
 
 class TestDatabaseManagerConnection:
-    """Test connection management."""
+    """One read-only connection per manager, one cursor per query."""
 
-    def test_get_connection_read_only(self, mock_db_path):
-        """Test that connections are opened in read-only mode."""
+    def test_connection_is_opened_once_read_only(self, mock_db_path):
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
             mock_duckdb.connect.return_value = mock_conn
-
             manager = DatabaseManager(mock_db_path)
-            with manager.get_connection() as conn:
-                assert conn == mock_conn
-
+            manager.execute_query("SELECT 1")
+            manager.execute_query("SELECT 2")
             mock_duckdb.connect.assert_called_once_with(str(mock_db_path), read_only=True)
-            mock_conn.close.assert_called_once()
+            assert mock_conn.cursor.call_count == 2
+            assert mock_conn.cursor.return_value.close.call_count == 2
+            mock_conn.close.assert_not_called()
 
-    def test_get_connection_closes_on_exception(self, mock_db_path):
-        """Test that connection is closed even if exception occurs."""
+    def test_cursor_closed_on_exception(self, mock_db_path):
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_conn = MagicMock()
-            mock_conn.execute.side_effect = Exception("Test error")
+            mock_conn.cursor.return_value.execute.side_effect = Exception("Test error")
             mock_duckdb.connect.return_value = mock_conn
-
             manager = DatabaseManager(mock_db_path)
+            with pytest.raises(DatabaseError):
+                manager.execute_query("SELECT * FROM test")
+            mock_conn.cursor.return_value.close.assert_called_once()
 
-            try:
-                with manager.get_connection() as conn:
-                    conn.execute("SELECT * FROM test")
-            except Exception:
-                pass
+    def test_close_and_reopen(self, mock_db_path):
+        with patch("internacia.database.duckdb") as mock_duckdb:
+            manager = DatabaseManager(mock_db_path)
+            manager.execute_query("SELECT 1")
+            manager.close()
+            mock_duckdb.connect.return_value.close.assert_called_once()
+            manager.execute_query("SELECT 1")
+            assert mock_duckdb.connect.call_count == 2
 
-            mock_conn.close.assert_called_once()
-
-    def test_get_connection_handles_connection_failure(self, mock_db_path):
-        """Test handling of connection failure."""
+    def test_connection_failure_is_a_database_error(self, mock_db_path):
         with patch("internacia.database.duckdb") as mock_duckdb:
             mock_duckdb.connect.side_effect = Exception("Connection failed")
-
             manager = DatabaseManager(mock_db_path)
+            with pytest.raises(DatabaseError, match="Connection failed"):
+                manager.execute_query("SELECT 1")
 
-            with pytest.raises(Exception, match="Connection failed"):
-                with manager.get_connection():
-                    pass
+    def test_real_connection_is_shared_across_threads(self, mock_db_path):
+        from concurrent.futures import ThreadPoolExecutor
+
+        manager = DatabaseManager(mock_db_path)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            counts = list(
+                pool.map(lambda _: manager.execute_query("SELECT count(*) FROM _meta"), range(32))
+            )
+        assert {c[0][0] for c in counts} == {2}
