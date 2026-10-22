@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   docstrings (OpenAI and plain JSON Schema formats), enum lists from the connected database, and
   `call_tool()` to execute tool calls. Replaces the hand-written `*_lookup.openai.json` files in
   internacia-db.
+- `.github/workflows/data-bump.yml` and `scripts/data_bump.py`: a pull request per new
+  internacia-db release that runs the tests against it (the pinned release moved to
+  `tests/internacia-db.json`) and merges automatically when the contract major is unchanged.
 - `internacia[mcp]` extra and the `internacia-mcp` command: an MCP stdio server with the same
   tools as `internacia.tools` (`internacia.mcp_server.build_server()` to embed it).
 

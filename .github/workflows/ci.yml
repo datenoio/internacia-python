@@ -11,9 +11,6 @@ permissions:
   contents: read
 
 env:
-  # internacia-db release the SDK is tested against. Bump both together.
-  TESTED_DB_VERSION: "3.0.0"
-  TESTED_DB_SHA256: "02c33d6822432ef60bce19b81e33b180221f6d6504c3e163f0e14f866254e01d"
   # Lower bound of the duckdb requirement in pyproject.toml.
   DUCKDB_MIN: "1.5.4"
 
@@ -54,6 +51,17 @@ jobs:
             pip install "duckdb==${DUCKDB_MIN}"
           fi
           python -c "import duckdb; print('duckdb', duckdb.__version__)"
+
+      # tests/internacia-db.json pins the internacia-db release the SDK is tested against;
+      # scripts/data_bump.py (data-bump.yml) updates it.
+      - name: Read the tested internacia-db release
+        run: |
+          python - >> "$GITHUB_ENV" <<'PY'
+          import json
+          pin = json.load(open("tests/internacia-db.json"))
+          print(f"TESTED_DB_VERSION={pin['version']}")
+          print(f"TESTED_DB_SHA256={pin['sha256']}")
+          PY
 
       - name: Cache test database
         uses: actions/cache@v4
