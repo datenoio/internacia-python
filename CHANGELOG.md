@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-10-22
 
 ### Added
 - `InternaciaClient.meta()`: version, `contract_version`, build identity and per-dataset row
@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/update_database.sh`; use `INTERNACIA_DB_PATH` for local builds.
 - `get_database_info()` (internal; release metadata came from the GitHub API).
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-10-22
 
 Supports internacia-db 3.x data. Tested against internacia-db 3.0.0.
 
