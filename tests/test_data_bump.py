@@ -2,7 +2,7 @@
 
 import importlib.util
 import json
-import shutil
+import re
 from pathlib import Path
 
 import pytest
@@ -20,7 +20,16 @@ def root(tmp_path, monkeypatch):
         json.dumps({"version": "3.0.0", "sha256": "a" * 64}), encoding="utf-8"
     )
     (tmp_path / "internacia").mkdir()
-    shutil.copy(REPO / "internacia" / "contract.py", tmp_path / "internacia" / "contract.py")
+    # The fixture pretends the SDK was last tested at contract 3.0, independent of the
+    # live pin, so a later data bump does not make these cases assert the old file.
+    contract = (REPO / "internacia" / "contract.py").read_text(encoding="utf-8")
+    contract = re.sub(
+        r"(?m)^TESTED_CONTRACT = \(\d+, \d+\)$",
+        "TESTED_CONTRACT = (3, 0)",
+        contract,
+        count=1,
+    )
+    (tmp_path / "internacia" / "contract.py").write_text(contract, encoding="utf-8")
     (tmp_path / "README.md").write_text(
         "| 0.4.x | 3.x (contract 3.x; tested against 3.0.0) |\n"
         "| 0.3.x | 3.x (tested against 3.0.0) |\n",
