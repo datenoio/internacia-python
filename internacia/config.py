@@ -8,74 +8,46 @@ from pathlib import Path
 class Config:
     """Configuration for internacia SDK."""
 
-    # Default database path (relative to internacia-db sibling)
-    DEFAULT_DB_RELATIVE_PATH = Path("internacia-db") / "data" / "datasets" / "internacia.duckdb"
-
     # Environment variable names
     ENV_DB_PATH = "INTERNACIA_DB_PATH"
     ENV_LOG_LEVEL = "INTERNACIA_LOG_LEVEL"
     ENV_CACHE_DIR = "INTERNACIA_CACHE_DIR"
+    ENV_DATA_VERSION = "INTERNACIA_DATA_VERSION"
 
     # Default values
     DEFAULT_LOG_LEVEL = logging.WARNING
 
     @classmethod
-    def get_db_path(cls, explicit_path: Path | None = None) -> Path | None:
+    def get_db_path(
+        cls, explicit_path: Path | None = None, data_version: str | None = None
+    ) -> Path | None:
         """
-        Get database path from various sources.
+        Get the database path.
 
         Priority:
-        1. Explicit path parameter
-        2. INTERNACIA_DB_PATH environment variable
-        3. Default relative path
-        4. Cached database (from downloader)
-
-        Args:
-            explicit_path: Explicitly provided database path
+        1. ``explicit_path``
+        2. ``INTERNACIA_DB_PATH``
+        3. The cached release ``data_version`` (or ``INTERNACIA_DATA_VERSION``), if pinned
+        4. The newest cached release with a supported contract major
 
         Returns:
-            Path to database file, or None if not found
+            Path to the database file, or None if none is found
         """
         if explicit_path:
             return Path(explicit_path)
 
-        # Check environment variable
         env_path = os.getenv(cls.ENV_DB_PATH)
         if env_path:
             return Path(env_path)
 
-        # Try default relative path
-        current_dir = Path(__file__).parent.parent.parent
-        default_path = current_dir.parent / cls.DEFAULT_DB_RELATIVE_PATH
-        if default_path.exists():
-            return default_path
+        # Lazy import: the downloader imports Config.
+        from internacia.downloader import (
+            get_cached_database_path,
+        )  # pylint: disable=import-outside-toplevel
 
-        # Try cached database (lazy import to avoid circular dependency)
-        try:
-            from internacia.downloader import (
-                get_cache_dir,
-                get_cached_database_path,
-            )  # pylint: disable=import-outside-toplevel
-
-            # First check unversioned cache path
-            cached_path = get_cached_database_path()
-            if cached_path.exists():
-                return cached_path
-
-            # If not found, check versioned cache directories
-            cache_dir = get_cache_dir()
-            if cache_dir.exists():
-                # Look for database files in versioned subdirectories
-                for item in cache_dir.iterdir():
-                    if item.is_dir():
-                        db_file = item / "internacia.duckdb"
-                        if db_file.exists():
-                            return db_file
-        except Exception:  # pylint: disable=broad-exception-caught
-            # If downloader not available or error, continue
-            pass
-
-        return None
+        pinned = data_version or os.getenv(cls.ENV_DATA_VERSION)
+        cached = get_cached_database_path(pinned)
+        return cached if cached.exists() else None
 
     @classmethod
     def get_log_level(cls) -> int:

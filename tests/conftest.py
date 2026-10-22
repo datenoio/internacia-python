@@ -2,17 +2,36 @@
 
 from unittest.mock import Mock
 
+import duckdb
 import pytest
 
 from internacia.database import DatabaseManager
 
 
+def make_meta_db(path, version="3.0.0", contract_version=None):
+    """Create a DuckDB file with only a ``_meta`` table (one row per dataset)."""
+    con = duckdb.connect(str(path))
+    try:
+        extra = ", contract_version VARCHAR" if contract_version is not None else ""
+        con.execute(
+            "CREATE TABLE _meta (dataset VARCHAR, version VARCHAR, build_date VARCHAR, "
+            "git_commit VARCHAR, row_count BIGINT, schema_hash VARCHAR, "
+            f"data_license VARCHAR{extra})"
+        )
+        for dataset, rows in (("countries", 256), ("intblocks", 1269)):
+            values = [dataset, version, "2026-10-16T14:30:59Z", "cd96e13", rows, "abc", "CC-BY-4.0"]
+            if contract_version is not None:
+                values.append(contract_version)
+            con.execute(f"INSERT INTO _meta VALUES ({', '.join('?' * len(values))})", values)
+    finally:
+        con.close()
+    return path
+
+
 @pytest.fixture
 def mock_db_path(tmp_path):
-    """Create a temporary database path for testing."""
-    db_file = tmp_path / "test.duckdb"
-    db_file.touch()
-    return db_file
+    """A DuckDB file with a contract 3.0 ``_meta`` table (internacia-db 3.0.0 layout)."""
+    return make_meta_db(tmp_path / "test.duckdb")
 
 
 @pytest.fixture

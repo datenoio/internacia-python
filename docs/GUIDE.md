@@ -56,8 +56,8 @@ The SDK resolves the database path in the following order:
 
 1. **Explicit `db_path` parameter** in `InternaciaClient()`
 2. **`INTERNACIA_DB_PATH` environment variable**
-3. **Default relative path**: `../internacia-db/data/datasets/internacia.duckdb`
-4. **Cached database**: `~/.internacia/internacia.duckdb`
+3. **Pinned cached release**: `data_version=` or `INTERNACIA_DATA_VERSION` (`~/.internacia/<tag>/internacia.duckdb`)
+4. **Newest cached release** with a supported contract major (download with `download_database()`)
 
 ### Environment Variables
 

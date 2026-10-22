@@ -2,7 +2,6 @@
 
 import logging
 from pathlib import Path
-from unittest.mock import patch
 
 from internacia.config import Config
 
@@ -23,25 +22,34 @@ class TestConfigGetDbPath:
         result = Config.get_db_path()
         assert result == Path(env_path)
 
-    def test_get_db_path_default_exists(self, monkeypatch):
-        """Test with default path when it exists."""
+    def test_get_db_path_uses_newest_cached_release(self, tmp_path, monkeypatch):
+        """Without an explicit path, the newest cached release is used (no sibling probe)."""
         monkeypatch.delenv("INTERNACIA_DB_PATH", raising=False)
+        monkeypatch.delenv("INTERNACIA_DATA_VERSION", raising=False)
+        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(tmp_path))
+        for tag in ("v3.0.0", "v3.1.0"):
+            (tmp_path / tag).mkdir()
+            (tmp_path / tag / "internacia.duckdb").write_bytes(b"x")
+        assert Config.get_db_path() == tmp_path / "v3.1.0" / "internacia.duckdb"
 
-        with patch("internacia.config.Path.exists", return_value=True):
-            with patch("internacia.config.Path.__init__", return_value=None):
-                with patch("internacia.config.Path.parent") as mock_parent:
-                    mock_parent.__truediv__ = lambda self, other: Path(f"/default/path/{other}")
-                    result = Config.get_db_path()
-                    # The exact path depends on the file location, but should not be None
-                    assert result is not None
+    def test_get_db_path_pinned_version(self, tmp_path, monkeypatch):
+        """A pinned data version selects that cached release, or nothing if it is missing."""
+        monkeypatch.delenv("INTERNACIA_DB_PATH", raising=False)
+        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(tmp_path))
+        for tag in ("v3.0.0", "v3.1.0"):
+            (tmp_path / tag).mkdir()
+            (tmp_path / tag / "internacia.duckdb").write_bytes(b"x")
+        assert Config.get_db_path(data_version="3.0.0") == tmp_path / "v3.0.0" / "internacia.duckdb"
+        monkeypatch.setenv("INTERNACIA_DATA_VERSION", "v3.1.0")
+        assert Config.get_db_path() == tmp_path / "v3.1.0" / "internacia.duckdb"
+        assert Config.get_db_path(data_version="3.9.0") is None
 
-    def test_get_db_path_not_found(self, monkeypatch):
+    def test_get_db_path_not_found(self, tmp_path, monkeypatch):
         """Test when no path is found."""
         monkeypatch.delenv("INTERNACIA_DB_PATH", raising=False)
-
-        with patch("internacia.config.Path.exists", return_value=False):
-            result = Config.get_db_path()
-            assert result is None
+        monkeypatch.delenv("INTERNACIA_DATA_VERSION", raising=False)
+        monkeypatch.setenv("INTERNACIA_CACHE_DIR", str(tmp_path))
+        assert Config.get_db_path() is None
 
 
 class TestConfigGetLogLevel:
