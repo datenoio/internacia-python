@@ -550,6 +550,16 @@ is neither historical nor dissolved. All participation statuses are kept.
   `get_country_timezones(cc)`, `get_by_timezone(tz)`; `get_regions()`, `get_region(id)`.
   Catalog entries carry `country_count`.
 
+## LLM tools (`internacia.tools`)
+
+- `tool_schemas(client=None) -> list[dict]`: `{"name", "description", "parameters"}` per tool.
+  One tool per public method of `countries`, `intblocks`, `memberships`, `blocktypes` and
+  `search` (`<client>_<method>`), plus `country_lookup` and `intblock_lookup`. With a client,
+  `enum` lists are filled from the database.
+- `openai_tools(client=None) -> list[dict]`: the same in the OpenAI `tools` format.
+- `call_tool(client, name, arguments) -> Any`: run a tool call; `arguments` is a dict or a JSON
+  string. Raises `KeyError` for unknown tools.
+
 ## Connection lifecycle
 
 The client holds one read-only DuckDB connection, opened on first use. `client.close()`
