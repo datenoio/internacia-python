@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Contract major this SDK release supports.
 SUPPORTED_CONTRACT_MAJOR = 3
 # Newest contract this SDK release was tested against.
-TESTED_CONTRACT = (3, 0)
+TESTED_CONTRACT = (3, 1)
 
 
 def parse_contract(value: str) -> tuple[int, int]:

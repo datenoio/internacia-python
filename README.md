@@ -16,7 +16,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 | internacia (SDK) | internacia-db data | duckdb | Python |
 |---|---|---|---|
-| 0.4.x | 3.x (contract 3.x; tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
+| 0.4.x | 3.x (contract 3.x; tested against 3.1.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.3.x | 3.x (tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.2.0 | 1.x–2.x; broken on 3.x | `>=0.9.0` | `>=3.8` (declared) |
 
