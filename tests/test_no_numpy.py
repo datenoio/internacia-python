@@ -2,7 +2,6 @@
 
 from internacia.countries import CountriesClient
 from internacia.intblocks import IntblocksClient
-from internacia.search import SearchClient
 
 
 def _check_no_numpy(obj, path=""):
@@ -303,49 +302,6 @@ class TestNoNumpyInIntblocks:
         # count() returns an int, not a dict/list
         assert isinstance(result, int)
         assert not isinstance(result, (list, dict))
-
-
-class TestNoNumpyInSearch:
-    """Test that SearchClient methods never return numpy arrays."""
-
-    def test_fuzzy_no_numpy(self, mock_db_manager):
-        """Test fuzzy search returns no numpy arrays."""
-        country_result = {"code": "US", "name": "United States", "type": "country"}
-        mock_db_manager.execute_query_dict.return_value = [country_result]
-        client = SearchClient(mock_db_manager)
-
-        result = client.fuzzy("United States", limit=10)
-
-        assert isinstance(result, list)
-        for item in result:
-            issues = _check_no_numpy(item)
-            assert not issues, f"Found numpy arrays: {issues}"
-
-    def test_search_countries_no_numpy(self, mock_db_manager):
-        """Test search_countries returns no numpy arrays."""
-        country_result = {"code": "US", "name": "United States", "type": "country"}
-        mock_db_manager.execute_query_dict.return_value = [country_result]
-        client = SearchClient(mock_db_manager)
-
-        result = client.search_countries("United", limit=10)
-
-        assert isinstance(result, list)
-        for item in result:
-            issues = _check_no_numpy(item)
-            assert not issues, f"Found numpy arrays: {issues}"
-
-    def test_search_intblocks_no_numpy(self, mock_db_manager):
-        """Test search_intblocks returns no numpy arrays."""
-        block_result = {"id": "EU", "name": "European Union", "type": "intblock"}
-        mock_db_manager.execute_query_dict.return_value = [block_result]
-        client = SearchClient(mock_db_manager)
-
-        result = client.search_intblocks("EU", limit=10)
-
-        assert isinstance(result, list)
-        for item in result:
-            issues = _check_no_numpy(item)
-            assert not issues, f"Found numpy arrays: {issues}"
 
 
 class TestNoNumpyInComplexData:

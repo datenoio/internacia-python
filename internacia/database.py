@@ -82,7 +82,7 @@ class DatabaseManager:
             self._relations = {row[0] for row in rows}
         return name in self._relations
 
-    def execute_query(self, query: str, parameters: tuple | None = None) -> list:
+    def execute_query(self, query: str, parameters: tuple | dict | None = None) -> list:
         """
         Execute a query and return results as a list of tuples.
 
@@ -111,7 +111,7 @@ class DatabaseManager:
             raise DatabaseError(f"Query execution failed: {str(e)}") from e
 
     def execute_query_dict(
-        self, query: str, parameters: tuple | None = None
+        self, query: str, parameters: tuple | dict | None = None
     ) -> list[dict[str, Any]]:
         """
         Execute a query and return results as a list of dictionaries.

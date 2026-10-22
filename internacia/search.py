@@ -10,6 +10,67 @@ from internacia.models import SearchResult
 logger = logging.getLogger(__name__)
 
 
+def _escape_like(text: str) -> str:
+    """Escape LIKE wildcards so they match literally (used with ``ESCAPE '\\'``)."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+# One query per table. _rank: 0 exact code/id, 1 name or code/id starts with the query,
+# 2 any other match; ties go to shorter names.
+COUNTRY_SEARCH_SQL = r"""
+SELECT * FROM (
+    SELECT c.*, 'country' AS type,
+        CASE
+            WHEN c.code = $upper OR c.iso3code = $upper OR c.numeric_code = $raw THEN 0
+            WHEN lower(c.name) LIKE $prefix ESCAPE '\'
+              OR lower(c.code) LIKE $prefix ESCAPE '\' THEN 1
+            ELSE 2
+        END AS _rank,
+        length(c.name) AS _name_length
+    FROM countries c
+    WHERE c.code = $upper
+       OR c.iso3code = $upper
+       OR c.numeric_code = $raw
+       OR upper(c.name) LIKE $pattern ESCAPE '\'
+       OR upper(c.official_name) LIKE $pattern ESCAPE '\'
+       OR EXISTS (
+            SELECT 1 FROM UNNEST(map_values(c.native_names)) AS t(native)
+            WHERE upper(native.common) LIKE $pattern ESCAPE '\'
+               OR upper(native.official) LIKE $pattern ESCAPE '\'
+       )
+)
+ORDER BY _rank, _name_length, code
+LIMIT $limit
+"""
+
+INTBLOCK_SEARCH_SQL = r"""
+SELECT * FROM (
+    SELECT i.*, 'intblock' AS type,
+        CASE
+            WHEN i.id = $upper THEN 0
+            WHEN lower(i.name) LIKE $prefix ESCAPE '\'
+              OR lower(i.id) LIKE $prefix ESCAPE '\' THEN 1
+            ELSE 2
+        END AS _rank,
+        length(i.name) AS _name_length
+    FROM intblocks i
+    WHERE i.id = $upper
+       OR upper(i.name) LIKE $pattern ESCAPE '\'
+       OR EXISTS (
+            SELECT 1 FROM UNNEST(i.other_names) AS t(other)
+            WHERE upper(other.name) LIKE $pattern ESCAPE '\'
+       )
+       OR EXISTS (
+            SELECT 1 FROM UNNEST(i.acronyms) AS t(acr)
+            WHERE upper(acr.value) LIKE $pattern ESCAPE '\'
+       )
+       OR list_contains(i.tags, $lower)
+)
+ORDER BY _rank, _name_length, id
+LIMIT $limit
+"""
+
+
 class SearchClient:
     """Client for searching countries and international blocks."""
 
@@ -72,140 +133,33 @@ class SearchClient:
             search_countries,
             search_intblocks,
         )
-        query_upper = query.upper()
-        query_lower = query.lower()
-        pattern = f"%{query_upper}%"
-        results: list[dict[str, Any]] = []
-
+        needle = query.strip()
+        upper = needle.upper()
+        pattern = "%" + _escape_like(upper) + "%"
+        prefix = _escape_like(needle.lower()) + "%"
+        params = {
+            "upper": upper,
+            "raw": needle,
+            "lower": needle.lower(),
+            "pattern": pattern,
+            "prefix": prefix,
+            "limit": limit,
+        }
+        candidates: list[dict[str, Any]] = []
         if search_countries:
-            results.extend(
-                self._db.execute_query_dict(
-                    "SELECT *, 'country' as type FROM countries WHERE code = ? LIMIT ?",
-                    (query_upper, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    "SELECT *, 'country' as type FROM countries WHERE iso3code = ? LIMIT ?",
-                    (query_upper, limit),
-                )
-            )
-            if query.isdigit():
-                results.extend(
-                    self._db.execute_query_dict(
-                        "SELECT *, 'country' as type FROM countries WHERE numeric_code = ? LIMIT ?",
-                        (query, limit),
-                    )
-                )
-            results.extend(
-                self._db.execute_query_dict(
-                    "SELECT *, 'country' as type FROM countries WHERE UPPER(name) LIKE ? LIMIT ?",
-                    (pattern, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    (
-                        "SELECT *, 'country' as type FROM countries "
-                        "WHERE UPPER(official_name) LIKE ? LIMIT ?"
-                    ),
-                    (pattern, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    """
-                SELECT c.*, 'country' as type
-                FROM countries c
-                WHERE EXISTS (
-                    SELECT 1 FROM UNNEST(map_values(c.native_names)) AS t(native)
-                    WHERE UPPER(native.common) LIKE ? OR UPPER(native.official) LIKE ?
-                )
-                LIMIT ?
-                """,
-                    (pattern, pattern, limit),
-                )
-            )
-
+            country_params = {k: v for k, v in params.items() if k != "lower"}
+            candidates += self._db.execute_query_dict(COUNTRY_SEARCH_SQL, country_params)
         if search_intblocks:
-            results.extend(
-                self._db.execute_query_dict(
-                    "SELECT *, 'intblock' as type FROM intblocks WHERE id = ? LIMIT ?",
-                    (query_upper, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    "SELECT *, 'intblock' as type FROM intblocks WHERE UPPER(name) LIKE ? LIMIT ?",
-                    (pattern, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    """
-                SELECT i.*, 'intblock' as type
-                FROM intblocks i
-                WHERE EXISTS (
-                    SELECT 1 FROM UNNEST(i.other_names) AS t(other)
-                    WHERE UPPER(other.name) LIKE ?
-                )
-                LIMIT ?
-                """,
-                    (pattern, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    """
-                SELECT i.*, 'intblock' as type
-                FROM intblocks i
-                WHERE EXISTS (
-                    SELECT 1 FROM UNNEST(i.acronyms) AS t(acr)
-                    WHERE UPPER(acr.value) LIKE ?
-                )
-                LIMIT ?
-                """,
-                    (pattern, limit),
-                )
-            )
-            results.extend(
-                self._db.execute_query_dict(
-                    """
-                SELECT *, 'intblock' as type
-                FROM intblocks
-                WHERE LIST_CONTAINS(tags, ?)
-                LIMIT ?
-                """,
-                    (query_lower, limit),
-                )
-            )
-
-        seen: set[tuple[str, Any]] = set()
-        unique_results: list[dict[str, Any]] = []
-        for item in results:
-            if item.get("type") == "country":
-                key = ("country", item.get("code"))
-            else:
-                key = ("intblock", item.get("id"))
-            if key not in seen:
-                seen.add(key)
-                unique_results.append(item)
-
-        def sort_key(item: dict[str, Any]) -> tuple[int, int]:
-            name = str(item.get("name") or "").lower()
-            code_or_id = str(item.get("code") or item.get("id") or "").lower()
-
-            if code_or_id == query_lower:
-                return (0, 0)
-            if name.startswith(query_lower) or code_or_id.startswith(query_lower):
-                return (1, len(name))
-            return (2, len(name))
-
-        unique_results.sort(key=sort_key)
-
-        final_results = cast(list[SearchResult], unique_results[:limit])
-        logger.debug("Fuzzy search returned %s results", len(final_results))
-        return final_results
+            block_params = {k: v for k, v in params.items() if k != "raw"}
+            candidates += self._db.execute_query_dict(INTBLOCK_SEARCH_SQL, block_params)
+        candidates.sort(key=lambda row: (row["_rank"], row["_name_length"]))
+        results = []
+        for row in candidates[:limit]:
+            row.pop("_rank")
+            row.pop("_name_length")
+            results.append(row)
+        logger.debug("Fuzzy search returned %s results", len(results))
+        return cast(list[SearchResult], results)
 
     def search_countries(self, query: str, limit: int = 10) -> list[SearchResult]:
         """
