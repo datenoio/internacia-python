@@ -549,7 +549,7 @@ The suite has three parts:
 # Unit tests only
 pytest
 
-# Download the pinned release database (version and SHA-256 are in .github/workflows/ci.yml)
+# Download the pinned release database (version and SHA-256 are in tests/internacia-db.json)
 python scripts/fetch_test_db.py --version 3.0.0 \
   --sha256 02c33d6822432ef60bce19b81e33b180221f6d6504c3e163f0e14f866254e01d \
   --output .test-data/internacia.duckdb
@@ -560,6 +560,13 @@ INTERNACIA_TEST_DB_PATH=.test-data/internacia.duckdb INTERNACIA_TEST_DB_VERSION=
 # With coverage report
 pytest --cov=internacia --cov-report=html
 ```
+
+New internacia-db releases are picked up by `.github/workflows/data-bump.yml`: daily, and when
+internacia-db announces a release, it runs `scripts/data_bump.py`, which moves
+`tests/internacia-db.json` (and `TESTED_CONTRACT` for a new contract minor) to the new release
+and opens a pull request. With the same contract major the pull request merges itself once CI
+passes; a new major waits for SDK changes. It needs the internacia-bot GitHub App, "Allow
+auto-merge", and branch protection on `main` that requires the CI checks.
 
 CI runs the full suite on Python 3.11, 3.12 and 3.13 with both the minimum supported duckdb (1.5.4) and the newest allowed one.
 
