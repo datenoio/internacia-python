@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-19
+
 ### Changed
 - Country search also matches `other_names` and `common_names`. internacia-db now keeps only
   the country's own languages in `native_names` (exonyms such as "Allemagne" moved to
