@@ -159,7 +159,7 @@ class CountriesClient:
         Get countries by World Bank income level.
 
         Args:
-            income_level_id: Income level ID (e.g., "OEC", "HIC", "LIC")
+            income_level_id: World Bank income level ID (e.g., "HIC", "UMC", "LIC")
 
         Returns:
             List of country dictionaries

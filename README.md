@@ -239,7 +239,7 @@ independent = client.countries.get_independent()
 countries = client.countries.get_by_region("NAC")  # North America
 
 # Get countries by income level
-countries = client.countries.get_by_income_level("OEC")  # High income: OECD
+countries = client.countries.get_by_income_level("HIC")  # High income
 
 # Get countries by continent
 countries = client.countries.get_by_continent("Europe")
@@ -302,7 +302,7 @@ count = client.intblocks.count()
 
 The fuzzy search function searches across countries and international blocks, supporting:
 
-- Country names (in any language via native_names)
+- Country names: `name`, `official_name`, `common_names`, names in other languages (`other_names`) and in the country's own languages (`native_names`)
 - Country codes (ISO 3166-1 alpha-2, alpha-3, numeric)
 - International block names
 - Block names in other languages (`other_names`)
@@ -474,7 +474,7 @@ Exception types:
 - `independent`: Boolean
 - `continents`: List of continent names
 - `borders`: List of bordering country codes
-- `native_names`: Map of language code -> `{official, common}`
+- `native_names`: Map of language code -> `{official, common}` for the country's own languages; names in other languages are in `other_names` (older internacia-db releases also listed English and UN-language names here)
 - And more...
 
 ### International Block Fields
