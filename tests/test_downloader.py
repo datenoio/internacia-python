@@ -85,8 +85,8 @@ class TestCache:
         assert downloader.cached_versions() == ["v3.10.0", "v3.9.0", "v2.2.0"]
 
     def test_cached_path_prefers_newest_supported_major(self, cache):
-        _cached(cache, "v3.1.0", "v3.2.0", "v4.0.0")
-        assert downloader.get_cached_database_path() == cache / "v3.2.0" / "internacia.duckdb"
+        _cached(cache, "v3.1.0", "v4.0.0", "v5.0.0")
+        assert downloader.get_cached_database_path() == cache / "v4.0.0" / "internacia.duckdb"
 
     def test_cached_path_for_version_and_legacy_fallback(self, cache):
         assert (
@@ -107,13 +107,13 @@ class TestLatestVersion:
 
     def test_newer_major_falls_back_to_newest_supported_release(self):
         releases = [
-            {"tag_name": "v4.0.0", "assets": [{"name": "internacia.duckdb"}]},
+            {"tag_name": "v5.0.0", "assets": [{"name": "internacia.duckdb"}]},
             {"tag_name": "v3.3.0", "assets": [{"name": "internacia.duckdb"}]},
             {"tag_name": "v3.4.0", "assets": [{"name": "README.md"}]},
         ]
         api = Mock(status_code=200, json=Mock(return_value=releases), raise_for_status=Mock())
         with (
-            patch("internacia.downloader.requests.head", return_value=_redirect("v4.0.0")),
+            patch("internacia.downloader.requests.head", return_value=_redirect("v5.0.0")),
             patch("internacia.downloader.requests.get", return_value=api),
         ):
             assert downloader.get_latest_version() == "v3.3.0"
@@ -121,7 +121,7 @@ class TestLatestVersion:
     def test_no_supported_release(self):
         api = Mock(status_code=200, json=Mock(return_value=[]), raise_for_status=Mock())
         with (
-            patch("internacia.downloader.requests.head", return_value=_redirect("v4.0.0")),
+            patch("internacia.downloader.requests.head", return_value=_redirect("v5.0.0")),
             patch("internacia.downloader.requests.get", return_value=api),
         ):
             with pytest.raises(VersionError):

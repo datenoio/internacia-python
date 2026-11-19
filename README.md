@@ -16,6 +16,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 | internacia (SDK) | internacia-db data | duckdb | Python |
 |---|---|---|---|
+| 0.5.x | 3.x and 4.x (contract 3.x or 4.x; tested against 3.1.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.4.x | 3.x (contract 3.x; tested against 3.1.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.3.x | 3.x (tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.2.0 | 1.x–2.x; broken on 3.x | `>=0.9.0` | `>=3.8` (declared) |
@@ -96,9 +97,11 @@ meta["datasets"]["countries"]  # {"row_count": 256, "schema_hash": "..."}
 ```
 
 internacia-db versions its schema as a data contract (`contract_version` = `MAJOR.MINOR`). This
-SDK release supports contract **3.x** and was tested against **3.0**:
+SDK release supports contracts **3.x** and **4.x** (`SUPPORTED_CONTRACT_MAJORS`) and was tested
+against **4.0**. Contract 4 changed what `native_names` contains (only the country's own
+languages; names in other languages are in `other_names`), not the tables or columns the SDK reads:
 
-- A different MAJOR raises `ContractError` when the client is created.
+- An unsupported MAJOR raises `ContractError` when the client is created.
 - A newer MINOR (new tables, columns or enum values) is accepted with a logged warning.
 - `InternaciaClient(check_contract=False)` skips the check.
 - Enum-like fields (`status`, `scope_category`, `geographic_scope`, …) are open strings: new

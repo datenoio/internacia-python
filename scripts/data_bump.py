@@ -7,7 +7,7 @@ that internacia-db sends after a release). It updates:
 - ``TESTED_CONTRACT`` in ``internacia/contract.py`` when the release has a newer contract minor;
 - the "tested against" version in the README compatibility table.
 
-A release with a different contract major is still written to ``tests/internacia-db.json`` so
+A release with an unsupported contract major is still written to ``tests/internacia-db.json`` so
 the pull request shows what fails, but it is not marked for auto-merge.
 
 Usage:
@@ -25,7 +25,12 @@ from pathlib import Path
 
 import requests
 
-from internacia.contract import SUPPORTED_CONTRACT_MAJOR, TESTED_CONTRACT, parse_contract
+from internacia.contract import (
+    SUPPORTED_CONTRACT_MAJORS,
+    TESTED_CONTRACT,
+    parse_contract,
+    supported_majors_text,
+)
 from internacia.downloader import (
     DB_FILE,
     DOWNLOAD_URL,
@@ -67,7 +72,7 @@ def bump(version: str, sha256: str, root: Path) -> list[str]:
     changed.append("tests/internacia-db.json")
 
     contract = parse_contract(version)
-    if contract[0] == SUPPORTED_CONTRACT_MAJOR and contract > TESTED_CONTRACT:
+    if contract[0] in SUPPORTED_CONTRACT_MAJORS and contract > TESTED_CONTRACT:
         path = root / "internacia" / "contract.py"
         text, count = re.subn(
             r"(?m)^TESTED_CONTRACT = \(\d+, \d+\)$",
@@ -111,7 +116,7 @@ def main() -> int:
     if new <= old:
         print(f"Already tested against internacia-db {current} (latest: {version})")
     else:
-        same_major = parse_contract(version)[0] == SUPPORTED_CONTRACT_MAJOR
+        same_major = parse_contract(version)[0] in SUPPORTED_CONTRACT_MAJORS
         changed = bump(version, database_sha256(tag), ROOT)
         outputs.update(changed="true", auto_merge=str(same_major).lower())
         print(f"internacia-db {current} -> {version}; updated {', '.join(changed)}")
@@ -131,7 +136,7 @@ def pr_body(current: str, version: str, same_major: bool, changed: list[str]) ->
         "Same contract major, so this merges automatically once CI passes. "
         "No SDK release is needed unless the release adds tables or columns the SDK should expose."
         if same_major
-        else f"**Contract major changed** (SDK supports {SUPPORTED_CONTRACT_MAJOR}.x): "
+        else f"**Contract major changed** (SDK supports {supported_majors_text()}): "
         "CI is expected to fail until the SDK supports the new contract. Not set to auto-merge."
     )
     files = "\n".join(f"- `{path}`" for path in changed)

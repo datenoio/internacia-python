@@ -8,7 +8,7 @@ international blocks, and fuzzy search across multiple languages.
 import logging
 
 from internacia.client import InternaciaClient
-from internacia.contract import SUPPORTED_CONTRACT_MAJOR, TESTED_CONTRACT
+from internacia.contract import SUPPORTED_CONTRACT_MAJOR, SUPPORTED_CONTRACT_MAJORS, TESTED_CONTRACT
 from internacia.downloader import (
     cached_versions,
     check_for_updates,
@@ -62,6 +62,7 @@ __all__ = [
     "VersionError",
     "ContractError",
     "SUPPORTED_CONTRACT_MAJOR",
+    "SUPPORTED_CONTRACT_MAJORS",
     "TESTED_CONTRACT",
     "cached_versions",
     "Country",
