@@ -338,8 +338,7 @@ All functions return pure Python types:
 
 ## Common Income Level IDs
 
-- `OEC`: High income: OECD
-- `HIC`: High income: nonOECD
+- `HIC`: High income
 - `UMC`: Upper middle income
 - `LMC`: Lower middle income
 - `LIC`: Low income

@@ -174,7 +174,7 @@ if country.get("region"):
     print(country["region"]["value"])  # "North America"
 
 if country.get("incomeLevel"):
-    print(country["incomeLevel"]["value"])  # "High income: OECD"
+    print(country["incomeLevel"]["value"])  # "High income"
 
 # Languages
 for lang in country.get("languages", []):

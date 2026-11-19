@@ -33,7 +33,7 @@ PUBLIC_CALLS: dict[str, Callable[[InternaciaClient], Any]] = {
     "countries.get_all": lambda c: c.countries.get_all(),
     "countries.get_all_limit": lambda c: c.countries.get_all(limit=5),
     "countries.get_by_region": lambda c: c.countries.get_by_region("NAC"),
-    "countries.get_by_income_level": lambda c: c.countries.get_by_income_level("OEC"),
+    "countries.get_by_income_level": lambda c: c.countries.get_by_income_level("HIC"),
     "countries.get_un_members": lambda c: c.countries.get_un_members(),
     "countries.get_independent": lambda c: c.countries.get_independent(),
     "countries.get_by_continent": lambda c: c.countries.get_by_continent("Europe"),

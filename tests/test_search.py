@@ -15,12 +15,18 @@ def search(tmp_path):
     con.execute("""
         CREATE TABLE countries AS SELECT * FROM (VALUES
           ('US', 'USA', '840', 'United States', 'United States of America',
-           MAP {'eng': {'official': 'United States of America', 'common': 'United States'}}),
+           MAP {'eng': {'official': 'United States of America', 'common': 'United States'}},
+           [{'id': 'fr', 'name': 'États-Unis'}], ['USA', 'America']),
           ('DE', 'DEU', '276', 'Germany', 'Federal Republic of Germany',
-           MAP {'deu': {'official': 'Bundesrepublik Deutschland', 'common': 'Deutschland'}}),
-          ('DK', 'DNK', '208', 'Denmark', 'Kingdom of Denmark', NULL),
-          ('GB', 'GBR', '826', 'United Kingdom', 'United Kingdom of Great Britain', NULL)
-        ) AS t(code, iso3code, numeric_code, name, official_name, native_names)
+           MAP {'deu': {'official': 'Bundesrepublik Deutschland', 'common': 'Deutschland'}},
+           [{'id': 'fr', 'name': 'Allemagne'}, {'id': 'ru', 'name': 'Германия'}], NULL),
+          ('DK', 'DNK', '208', 'Denmark', 'Kingdom of Denmark', NULL, NULL, NULL),
+          ('KR', 'KOR', '410', 'Korea, Rep.', 'Republic of Korea', NULL, NULL,
+           ['South Korea']),
+          ('GB', 'GBR', '826', 'United Kingdom', 'United Kingdom of Great Britain',
+           NULL, NULL, NULL)
+        ) AS t(code, iso3code, numeric_code, name, official_name, native_names,
+               other_names, common_names)
         """)
     con.execute("""
         CREATE TABLE intblocks AS SELECT * FROM (VALUES
@@ -55,6 +61,13 @@ def test_names_in_other_languages_and_acronyms(search):
     assert ids(search.fuzzy("欧盟")) == ["EU"]
     assert ids(search.fuzzy("ONU")) == ["UN"]
     assert ids(search.fuzzy("trade")) == ["USMCA"]
+
+
+def test_country_names_in_other_languages_and_common_names(search):
+    assert ids(search.fuzzy("Allemagne")) == ["DE"]
+    assert ids(search.fuzzy("Германия")) == ["DE"]
+    assert ids(search.fuzzy("South Korea")) == ["KR"]
+    assert ids(search.fuzzy("America"))[0] == "US"
 
 
 def test_each_record_once_and_types(search):

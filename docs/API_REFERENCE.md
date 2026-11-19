@@ -187,23 +187,25 @@ north_america = client.countries.get_by_region("NAC")
 Get countries by World Bank income level.
 
 **Parameters:**
-- `income_level_id` (str): Income level ID (e.g., "OEC", "HIC", "LIC")
+- `income_level_id` (str): World Bank income level ID (e.g., "HIC", "UMC", "LIC")
 
 **Returns:**
 - `List[Country]`: List of country dictionaries with the specified income level
 
 **Example:**
 ```python
-# Get high-income OECD countries
-high_income = client.countries.get_by_income_level("OEC")
+# Get high-income economies
+high_income = client.countries.get_by_income_level("HIC")
 ```
 
 **Common Income Level IDs:**
-- `OEC`: High income: OECD
-- `HIC`: High income: nonOECD
+- `HIC`: High income
 - `UMC`: Upper middle income
 - `LMC`: Lower middle income
 - `LIC`: Low income
+
+The World Bank retired the `OEC`/`NOC` (high income OECD/non-OECD) split in 2016; internacia-db
+data after 3.1 uses `HIC` for every high-income economy.
 
 ---
 
@@ -576,7 +578,7 @@ Client for searching countries and international blocks.
 Perform fuzzy search across countries and international blocks.
 
 This function searches across:
-- Country names (in any language via native_names)
+- Country names: `name`, `official_name`, `common_names`, names in other languages (`other_names`) and in the country's own languages (`native_names`)
 - Country codes (ISO 3166-1 alpha-2, alpha-3, numeric)
 - International block names
 - Block names in other languages (`other_names`)
@@ -769,7 +771,7 @@ Country data structure.
 - `independent` (bool): Whether the country is independent
 - `continents` (List[str]): List of continent names
 - `borders` (List[str]): List of bordering country codes
-- `native_names` (Dict[str, NativeName]): Map of language code to native names
+- `native_names` (Dict[str, NativeName]): Map of language code to names in the country's own languages; either field may be missing. Names in other languages are in `other_names`
 
 **Example:**
 ```python

@@ -38,6 +38,14 @@ SELECT * FROM (
             WHERE upper(native.common) LIKE $pattern ESCAPE '\'
                OR upper(native.official) LIKE $pattern ESCAPE '\'
        )
+       OR EXISTS (
+            SELECT 1 FROM UNNEST(c.other_names) AS t(other)
+            WHERE upper(other.name) LIKE $pattern ESCAPE '\'
+       )
+       OR EXISTS (
+            SELECT 1 FROM UNNEST(c.common_names) AS t(common_name)
+            WHERE upper(common_name) LIKE $pattern ESCAPE '\'
+       )
 )
 ORDER BY _rank, _name_length, code
 LIMIT $limit
@@ -94,7 +102,8 @@ class SearchClient:
         Perform fuzzy search across countries and international blocks.
 
         This function searches across:
-        - Country names (in any language via native_names)
+        - Country names: ``name``, ``official_name``, ``common_names``, names in other
+          languages (``other_names``) and in the country's own languages (``native_names``)
         - Country codes (ISO 3166-1 alpha-2, alpha-3, numeric)
         - International block names
         - Block names in other languages (other_names)

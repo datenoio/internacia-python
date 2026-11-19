@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Country search also matches `other_names` and `common_names`. internacia-db now keeps only
+  the country's own languages in `native_names` (exonyms such as "Allemagne" moved to
+  `other_names`), so without this a search in another language would stop finding the country.
+- Documentation and examples use the current World Bank income levels (`HIC`, `UMC`, `LMC`,
+  `LIC`); the `OEC`/`NOC` split was retired in 2016 and is gone from internacia-db data.
+
 ## [0.4.0] - 2026-10-22
 
 ### Added
