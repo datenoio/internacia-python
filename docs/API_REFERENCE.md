@@ -972,7 +972,7 @@ except VersionError as e:
 ### ContractError
 
 Subclass of `VersionError`. Raised by `InternaciaClient` when the database's contract major is
-not the one this SDK supports (`SUPPORTED_CONTRACT_MAJOR`), or the database has no `_meta`
+not one this SDK supports (`SUPPORTED_CONTRACT_MAJORS`, 3 and 4), or the database has no `_meta`
 table. A newer contract minor only logs a warning.
 
 ## Return Types

@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from internacia import SUPPORTED_CONTRACT_MAJOR, InternaciaClient
+from internacia import SUPPORTED_CONTRACT_MAJORS, InternaciaClient
 
 PLAIN = (str, int, float, bool, type(None), datetime.date, datetime.datetime, Decimal)
 
@@ -31,8 +31,9 @@ def assert_plain(value: Any, path: str = "result") -> None:
 
 def test_meta_and_contract(client: InternaciaClient) -> None:
     meta = client.meta()
-    assert int(meta["contract_version"].split(".")[0]) == SUPPORTED_CONTRACT_MAJOR
-    assert meta["version"].split(".")[0] == str(SUPPORTED_CONTRACT_MAJOR)
+    major = int(meta["contract_version"].split(".")[0])
+    assert major in SUPPORTED_CONTRACT_MAJORS
+    assert meta["version"].split(".")[0] == str(major)
     for dataset in ("countries", "intblocks", "blocktypes", "memberships"):
         assert meta["datasets"][dataset]["row_count"] > 0
         assert meta["datasets"][dataset]["schema_hash"]

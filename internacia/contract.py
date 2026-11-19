@@ -13,10 +13,20 @@ from internacia.exceptions import ContractError
 
 logger = logging.getLogger(__name__)
 
-# Contract major this SDK release supports.
-SUPPORTED_CONTRACT_MAJOR = 3
+# Contract majors this SDK release supports, oldest first. internacia-db 4.0 changed what
+# ``countries.native_names`` contains (only the country's own languages) and deprecated two
+# membership statuses; no table, column or type the SDK reads changed, so the same code reads
+# 3.x and 4.x databases.
+SUPPORTED_CONTRACT_MAJORS = (3, 4)
+# Newest supported contract major.
+SUPPORTED_CONTRACT_MAJOR = SUPPORTED_CONTRACT_MAJORS[-1]
 # Newest contract this SDK release was tested against.
-TESTED_CONTRACT = (3, 1)
+TESTED_CONTRACT = (4, 0)
+
+
+def supported_majors_text() -> str:
+    """``"3.x or 4.x"``: the supported contract majors, for messages."""
+    return " or ".join(f"{major}.x" for major in SUPPORTED_CONTRACT_MAJORS)
 
 
 def parse_contract(value: str) -> tuple[int, int]:
@@ -34,10 +44,10 @@ def check_contract(meta: dict[str, Any]) -> None:
     warning if its minor is newer than the one this SDK was tested against.
     """
     major, minor = parse_contract(meta["contract_version"])
-    if major != SUPPORTED_CONTRACT_MAJOR:
+    if major not in SUPPORTED_CONTRACT_MAJORS:
         raise ContractError(
             f"internacia-db contract {major}.{minor} (data version {meta.get('version')}) is not "
-            f"supported by this SDK, which requires contract {SUPPORTED_CONTRACT_MAJOR}.x. "
+            f"supported by this SDK, which requires contract {supported_majors_text()}. "
             "Use a matching internacia release or download a compatible database."
         )
     if (major, minor) > TESTED_CONTRACT:

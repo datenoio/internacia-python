@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-19
+
+### Added
+- Support for internacia-db contract 4 (internacia-db 4.0.0). The SDK reads 3.x and 4.x
+  databases: `SUPPORTED_CONTRACT_MAJORS = (3, 4)`, and `SUPPORTED_CONTRACT_MAJOR` is now the
+  newest of them (4). Contract 4 keeps only the country's own languages in `native_names` and
+  deprecates the `associate` and `associated_observer` membership statuses
+  (use `associate_member`); no table, column or type the SDK reads changed.
+
+### Changed
+- Without `data_version`, the client, `get_latest_version()` and the cache lookup pick the newest
+  release with a supported contract major, so they move to internacia-db 4.x once it is
+  published. Pin `data_version="3.1.0"` (or `INTERNACIA_DATA_VERSION`) to stay on 3.x.
+- `TESTED_CONTRACT` is `(4, 0)`.
+
 ## [0.4.1] - 2026-11-19
 
 ### Changed

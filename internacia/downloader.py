@@ -17,7 +17,7 @@ from pathlib import Path
 import requests
 
 from internacia.config import Config
-from internacia.contract import SUPPORTED_CONTRACT_MAJOR
+from internacia.contract import SUPPORTED_CONTRACT_MAJORS, supported_majors_text
 from internacia.exceptions import DownloadError, VersionError
 
 logger = logging.getLogger(__name__)
@@ -91,7 +91,7 @@ def get_cached_database_path(version: str | None = None) -> Path:
         return cache_dir / release_tag(version) / DB_FILE
     for tag in cached_versions():
         parsed = parse_version(tag)
-        if parsed and parsed[0] == SUPPORTED_CONTRACT_MAJOR:
+        if parsed and parsed[0] in SUPPORTED_CONTRACT_MAJORS:
             return cache_dir / tag / DB_FILE
     return cache_dir / DB_FILE
 
@@ -150,7 +150,7 @@ def get_latest_version() -> str:
         VersionError: If no release has a supported contract major
     """
     tag = _latest_release_tag()
-    if parse_version(tag)[0] == SUPPORTED_CONTRACT_MAJOR:  # type: ignore[index]
+    if parse_version(tag)[0] in SUPPORTED_CONTRACT_MAJORS:  # type: ignore[index]
         return tag
     logger.info("Latest release %s has a different contract major; searching older releases", tag)
     compatible = [
@@ -158,10 +158,10 @@ def get_latest_version() -> str:
         for r in list_releases()
         if r["has_database"]
         and (parsed := parse_version(r["tag_name"])) is not None
-        and parsed[0] == SUPPORTED_CONTRACT_MAJOR
+        and parsed[0] in SUPPORTED_CONTRACT_MAJORS
     ]
     if not compatible:
-        raise VersionError(f"No internacia-db {SUPPORTED_CONTRACT_MAJOR}.x release found")
+        raise VersionError(f"No internacia-db {supported_majors_text()} release found")
     return str(max(compatible)[1])
 
 
@@ -304,7 +304,7 @@ def check_for_updates() -> dict:
     """
     latest = get_latest_version()
     current = next(
-        (tag for tag in cached_versions() if parse_version(tag)[0] == SUPPORTED_CONTRACT_MAJOR),  # type: ignore[index]
+        (tag for tag in cached_versions() if parse_version(tag)[0] in SUPPORTED_CONTRACT_MAJORS),  # type: ignore[index]
         None,
     )
     return {
