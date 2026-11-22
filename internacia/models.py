@@ -146,6 +146,72 @@ class Membership(TypedDict, total=False):
     left: str | None
 
 
+class TradeAgreement(TypedDict, total=False):
+    """One trade agreement (``trade_agreements`` table, internacia-db 5.0 and later).
+
+    ``intblock_id`` is the intblock (same id) that holds the roster of some agreements with
+    three or more parties. ``verification`` is ``official`` or
+    ``catalogue``.
+    """
+
+    id: str
+    name: str | None
+    agreement_type: str | None
+    status: str | None
+    signed: str | None
+    in_force: str | None
+    ended: str | None
+    intblock_id: str | None
+    party_count: int | None
+    supersedes: str | None
+    superseded_by: str | None
+    wto_rta_id: int | None
+    aric_id: int | None
+    wikidata_id: str | None
+    acronyms: list[Acronym] | None
+    other_names: list[dict[str, str | None]] | None
+    links: list[dict[str, str | None]] | None
+    description: str | None
+    notes: str | None
+    verification: str | None
+    last_verified: str | None
+    provenance: list[dict[str, str | None]] | None
+
+
+class TradeAgreementParty(TypedDict, total=False):
+    """One party of a trade agreement (``trade_agreement_parties`` table).
+
+    ``party_id`` is a country code, or an intblock id when ``party_type`` is ``intblock``
+    (the EU); ``historical-country`` parties may use codes not in ``countries``.
+    """
+
+    agreement_id: str
+    party_id: str
+    party_type: str | None
+    status: str | None
+    signed: str | None
+    in_force: str | None
+    joined: str | None
+    left: str | None
+    note: str | None
+    source: str | None
+
+
+class CountryTradeAgreement(TypedDict, total=False):
+    """A trade agreement a country is a current party to (``country_trade_agreements`` view).
+
+    ``via`` is the bloc (e.g. ``EU``) through which the country is a party, or None when it
+    is a party itself.
+    """
+
+    country_code: str
+    agreement_id: str
+    via: str | None
+    agreement_type: str | None
+    agreement_status: str | None
+    in_force: str | None
+
+
 class Blocktype(TypedDict, total=False):
     """A block type from the ``blocktypes`` taxonomy."""
 
@@ -155,12 +221,14 @@ class Blocktype(TypedDict, total=False):
 
 
 class IdResolution(TypedDict):
-    """Result of resolving a possibly retired or renamed identifier.
+    """Result of resolving a possibly retired, renamed or moved identifier.
 
     ``status`` is ``current`` (``id`` exists), an alias reason (``renamed``, ``merged``,
-    ``retired``; ``id`` is the replacement or None for ``retired``), or ``unknown``.
-    ``disambiguated`` is set when the input is a current id that previously named a
-    different entity, which moved to that id.
+    ``moved``, ``retired``; ``id`` is the replacement or None for ``retired``), or
+    ``unknown``. ``disambiguated`` is set when the input is a current id that previously
+    named a different entity, which moved to that id. ``target_dataset`` is the table that
+    holds ``id`` (None when ``id`` is None): ``intblocks`` or ``countries`` except for
+    ``moved`` ids, which internacia-db 5.0 moved to ``trade_agreements`` under the same id.
     """
 
     input: str
@@ -169,6 +237,7 @@ class IdResolution(TypedDict):
     since: str | None
     note: str | None
     disambiguated: str | None
+    target_dataset: str | None
 
 
 class CurrencyEntry(TypedDict):

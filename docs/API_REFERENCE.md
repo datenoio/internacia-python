@@ -7,6 +7,8 @@ Complete API reference for the Internacia Python SDK.
 - [InternaciaClient](#internaciaclient)
 - [CountriesClient](#countriesclient)
 - [IntblocksClient](#intblocksclient)
+- [MembershipsClient](#membershipsclient)
+- [TradeAgreementsClient](#tradeagreementsclient)
 - [SearchClient](#searchclient)
 - [Downloader Functions](#downloader-functions)
 - [Data Models](#data-models)
@@ -540,12 +542,32 @@ is neither historical nor dissolved. All participation statuses are kept.
 
 `client.blocktypes`: `get_all() -> list[Blocktype]`, `get_by_id(id) -> Blocktype | None`.
 
+## TradeAgreementsClient
+
+`client.trade_agreements`: the trade agreements registry of internacia-db 5.0 and later
+(`trade_agreements`, `trade_agreement_parties` and the `country_trade_agreements` view). On
+databases before 5.0 every method returns None or an empty list.
+
+- `get_by_id(agreement_id) -> TradeAgreement | None`: `id`, `name`, `agreement_type`, `status`,
+  `signed`, `in_force`, `ended`, `intblock_id`, `party_count`, `wto_rta_id`, `aric_id`,
+  `verification`, `provenance`, …
+- `get_parties(agreement_id, current_only=False) -> list[TradeAgreementParty]`: one row per party
+  (`party_id`, `party_type` `country`/`territory`/`historical-country`/`intblock`, `status`
+  `party`/`former_party`, `joined`, `left`, `source`), ordered by `party_id`. `current_only`
+  leaves out former parties.
+- `get_by_country(country_code) -> list[CountryTradeAgreement]`: agreements the country is a
+  current party to (`agreement_id`, `via`, `agreement_type`, `agreement_status`, `in_force`);
+  `via` is the bloc (e.g. `EU`) for agreements the country is party to through it.
+
 ## Identifier resolution and catalogs
 
 - `client.intblocks.resolve_id(block_id) -> IdResolution` and
   `client.countries.resolve_code(code) -> IdResolution`: `{"input", "id", "status", "since",
-  "note", "disambiguated"}` with `status` `current`, `renamed`, `merged`, `retired` or
-  `unknown`. Needs the alias tables in `internacia.duckdb` (releases after 3.0.0).
+  "note", "disambiguated", "target_dataset"}` with `status` `current`, `renamed`, `merged`,
+  `moved`, `retired` or `unknown`. `target_dataset` is the table that holds `id`: `intblocks`
+  or `countries`, or `trade_agreements` for the two-party FTAs internacia-db 5.0 moved there
+  (`status` `moved`, same id). Needs the alias tables in `internacia.duckdb` (releases after
+  3.0.0).
 - `client.intblocks.get_by_member(country_code, current_only=False)`.
 - `client.countries.get_currencies()`, `get_currency(code)`, `get_country_currencies(cc)`;
   `get_languages()`, `get_language(code)`, `get_country_languages(cc)`; `get_timezones()`,
@@ -555,9 +577,10 @@ is neither historical nor dissolved. All participation statuses are kept.
 ## LLM tools (`internacia.tools`)
 
 - `tool_schemas(client=None) -> list[dict]`: `{"name", "description", "parameters"}` per tool.
-  One tool per public method of `countries`, `intblocks`, `memberships`, `blocktypes` and
-  `search` (`<client>_<method>`), plus `country_lookup` and `intblock_lookup`. With a client,
-  `enum` lists are filled from the database.
+  One tool per public method of `countries`, `intblocks`, `memberships`, `blocktypes`,
+  `trade_agreements` and `search` (`<client>_<method>`), plus `country_lookup` and
+  `intblock_lookup` (an id moved to the trade agreements registry returns the agreement). With
+  a client, `enum` lists are filled from the database.
 - `openai_tools(client=None) -> list[dict]`: the same in the OpenAI `tools` format.
 - `call_tool(client, name, arguments) -> Any`: run a tool call; `arguments` is a dict or a JSON
   string. Raises `KeyError` for unknown tools.
@@ -972,7 +995,7 @@ except VersionError as e:
 ### ContractError
 
 Subclass of `VersionError`. Raised by `InternaciaClient` when the database's contract major is
-not one this SDK supports (`SUPPORTED_CONTRACT_MAJORS`, 3 and 4), or the database has no `_meta`
+not one this SDK supports (`SUPPORTED_CONTRACT_MAJORS`: 3, 4 and 5), or the database has no `_meta`
 table. A newer contract minor only logs a warning.
 
 ## Return Types

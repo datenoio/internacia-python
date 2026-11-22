@@ -6,6 +6,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 - 🌍 **Countries Data**: Access comprehensive country information including codes, names, currencies, languages, and more
 - 🏛️ **International Blocks**: Query international organizations, alliances, and unions
+- 🤝 **Trade Agreements**: FTAs, customs unions and their parties (internacia-db 5.0 and later)
 - 🔍 **Fuzzy Search**: Multi-language search supporting partial matches across names, codes, acronyms, and names in other languages
 - 🚀 **Thread-Safe**: Built on DuckDB with thread-safe connection handling
 - 🌐 **Multi-Language**: Search works across all languages supported in the dataset
@@ -16,6 +17,7 @@ A Python SDK for accessing [internacia-db](https://github.com/datenoio/internaci
 
 | internacia (SDK) | internacia-db data | duckdb | Python |
 |---|---|---|---|
+| 0.6.x | 3.x, 4.x and 5.x (contract 3.x, 4.x or 5.x; tested against 4.4.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.5.x | 3.x and 4.x (contract 3.x or 4.x; tested against 4.4.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.4.x | 3.x (contract 3.x; tested against 3.1.0) | `>=1.5.4,<3` | `>=3.11` |
 | 0.3.x | 3.x (tested against 3.0.0) | `>=1.5.4,<3` | `>=3.11` |
@@ -97,9 +99,12 @@ meta["datasets"]["countries"]  # {"row_count": 256, "schema_hash": "..."}
 ```
 
 internacia-db versions its schema as a data contract (`contract_version` = `MAJOR.MINOR`). This
-SDK release supports contracts **3.x** and **4.x** (`SUPPORTED_CONTRACT_MAJORS`) and was tested
-against **4.0**. Contract 4 changed what `native_names` contains (only the country's own
-languages; names in other languages are in `other_names`), not the tables or columns the SDK reads:
+SDK release supports contracts **3.x**, **4.x** and **5.x** (`SUPPORTED_CONTRACT_MAJORS`) and was
+tested against **5.0**. Contract 4 changed what `native_names` contains (only the country's own
+languages; names in other languages are in `other_names`). Contract 5 added the trade agreements
+registry and moved 34 two-party FTAs (`USKR`, `CETA`, `EUJP`, …) from intblocks to it under the
+same id (see [Trade agreements](#trade-agreements)). Neither changed the tables or columns the SDK
+reads:
 
 - An unsupported MAJOR raises `ContractError` when the client is created.
 - A newer MINOR (new tables, columns or enum values) is accepted with a logged warning.
@@ -125,11 +130,33 @@ with InternaciaClient() as client:   # closes the connection on exit
     client.countries.resolve_code("KV")    # {"id": "XK", "status": "renamed", ...}
 ```
 
-`resolve_id` returns `status` `current`, an alias reason (`renamed`, `merged`, `retired`) with
-the replacement `id` (None when retired), or `unknown`. `disambiguated` is set when the id is
-current but used to name another entity. Alias resolution needs an internacia-db release that
-ships the alias tables inside `internacia.duckdb` (after 3.0.0); with 3.0.0 only `current` and
-`unknown` are reported.
+`resolve_id` returns `status` `current`, an alias reason (`renamed`, `merged`, `moved`,
+`retired`) with the replacement `id` (None when retired), or `unknown`. `disambiguated` is set
+when the id is current but used to name another entity. `target_dataset` is the table that holds
+`id`: `intblocks` (or `countries`), except for `moved` ids, which are in `trade_agreements`. Alias
+resolution needs an internacia-db release that ships the alias tables inside `internacia.duckdb`
+(after 3.0.0); with 3.0.0 only `current` and `unknown` are reported.
+
+### Trade agreements
+
+internacia-db 5.0 has a trade agreements registry: FTAs, customs unions, PTAs, preference
+schemes, services, digital and framework agreements, with their parties. The two-party FTAs
+that used to be intblocks moved there with the same id; `USCR` was merged into `CAFTADR`.
+
+```python
+client.trade_agreements.get_by_id("USKR")         # {"agreement_type": "fta", "status": "in_force", ...}
+client.trade_agreements.get_parties("CETA")       # [{"party_id": "CA", ...}, {"party_id": "EU", "party_type": "intblock", ...}]
+client.trade_agreements.get_by_country("FR")      # current agreements, with via="EU" for the EU's
+
+resolved = client.intblocks.resolve_id("USKR")    # {"status": "moved", "target_dataset": "trade_agreements", ...}
+if resolved["target_dataset"] == "trade_agreements":
+    record = client.trade_agreements.get_by_id(resolved["id"])
+```
+
+`get_parties(..., current_only=True)` leaves out former parties. `get_by_country` reads the
+`country_trade_agreements` view: agreements the country is a current party to, directly or
+through a bloc it currently belongs to; filter `agreement_status` for in-force agreements. On
+databases before 5.0 the methods return None or an empty list.
 
 ### Derived catalogs
 
@@ -151,8 +178,9 @@ client.countries.get_regions(); client.countries.get_region("ECS")
 ### LLM tools
 
 `internacia.tools` turns the SDK into function-calling tools. Every public query method is a
-tool (`countries_get_by_code`, `memberships_get_by_intblock`, …) whose schema is generated from
-its signature and docstring, plus two composite tools, `country_lookup` and `intblock_lookup`.
+tool (`countries_get_by_code`, `memberships_get_by_intblock`, `trade_agreements_get_by_country`,
+…) whose schema is generated from its signature and docstring, plus two composite tools,
+`country_lookup` and `intblock_lookup` (which returns the trade agreement for a moved id).
 Passing a client fills `enum` lists (regions, statuses, block types, scope categories) from the
 connected data version.
 

@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-22
+
+### Added
+- Support for internacia-db contract 5 (internacia-db 5.0.0). The SDK reads 3.x, 4.x and 5.x
+  databases: `SUPPORTED_CONTRACT_MAJORS = (3, 4, 5)`, `SUPPORTED_CONTRACT_MAJOR` is 5 and
+  `TESTED_CONTRACT` is `(5, 0)`. Contract 5 added the trade agreements registry and moved 34
+  two-party FTA intblocks (`USKR`, `CETA`, `EUJP`, `CHAFTA`, …) out of `intblocks` and
+  `memberships` into it under the same id; `USCR` was merged into `CAFTADR`. No table, column or
+  type the SDK reads changed.
+- `client.trade_agreements`: `get_by_id()`, `get_parties()` (optionally current parties only)
+  and `get_by_country()` (the `country_trade_agreements` view: current agreements, directly or
+  through a bloc such as the EU), with the `TradeAgreement`, `TradeAgreementParty` and
+  `CountryTradeAgreement` types. They return None or an empty list on databases before 5.0.
+  The methods are also LLM and MCP tools (`trade_agreements_get_by_id`, …).
+- `IdResolution.target_dataset`: the table that holds the resolved `id`. It is
+  `trade_agreements` for ids with the new alias reason `moved` (from
+  `intblocks_aliases.target_dataset`), so callers know not to look them up in intblocks;
+  otherwise `intblocks` or `countries`, and None when there is no `id`.
+
+### Changed
+- `intblock_lookup` (LLM and MCP tool) returns the trade agreement for an id that moved to the
+  registry, instead of nothing.
+- `ContractError` messages list the supported majors as "3.x, 4.x or 5.x".
+- `tests/contract` checks the trade agreements registry and moved ids on 5.x databases and that
+  the accessor returns nothing on older ones.
+
 ## [0.5.0] - 2026-11-19
 
 ### Added

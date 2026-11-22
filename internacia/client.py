@@ -14,6 +14,7 @@ from internacia.exceptions import ContractError, DatabaseError
 from internacia.intblocks import IntblocksClient
 from internacia.memberships import MembershipsClient
 from internacia.search import SearchClient
+from internacia.trade_agreements import TradeAgreementsClient
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,9 @@ class InternaciaClient:
     """
     Main client for accessing internacia-db data.
 
-    This client provides access to countries, international blocks, and search
-    functionality through a unified interface.
+    This client provides access to countries, international blocks, memberships, block
+    types, trade agreements (internacia-db 5.0 and later) and search through a unified
+    interface.
 
     Example:
         >>> from internacia import InternaciaClient
@@ -83,6 +85,7 @@ class InternaciaClient:
         self.intblocks = IntblocksClient(self._db_manager)
         self.memberships = MembershipsClient(self._db_manager)
         self.blocktypes = BlocktypesClient(self._db_manager)
+        self.trade_agreements = TradeAgreementsClient(self._db_manager)
         self.search = SearchClient(self._db_manager)
 
     def close(self) -> None:

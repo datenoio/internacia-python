@@ -19,6 +19,7 @@ SAMPLE_ARGS = {
     "country_code": "FR",
     "timezone": "Europe/Paris",
     "block_id": "NATO",
+    "agreement_id": "CETA",
     "blocktype": "economic",
     "blocktype_id": "economic",
     "status": "formal",
@@ -55,6 +56,11 @@ def test_every_tool_runs_and_returns_json(client: InternaciaClient, schema: dict
             args["limit"] = SAMPLE_ARGS["limit"]
     result = call_tool(client, schema["name"], json.dumps(args))
     json.dumps(result, default=str)
+    # Databases before internacia-db 5.0 have no trade agreements registry.
+    no_registry = not client._db_manager.has_relation("trade_agreements")
+    if schema["name"].startswith("trade_agreements_") and no_registry:
+        assert result in (None, [])
+        return
     assert result not in (None, [], {}) or schema["name"].endswith("count")
 
 
