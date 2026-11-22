@@ -135,3 +135,39 @@ def test_v3_model(client: InternaciaClient) -> None:
     assert client.countries.resolve_code("FR")["status"] == "current"
     for rows in (nato, client.countries.get_currencies(), client.blocktypes.get_all()):
         assert_plain(rows)
+
+
+def test_trade_agreements(client: InternaciaClient) -> None:
+    """Trade agreements registry (contract 5); older databases return nothing."""
+    registry = client.trade_agreements
+    if int(client.meta()["contract_version"].split(".")[0]) < 5:
+        assert registry.get_by_id("USKR") is None
+        assert registry.get_parties("USKR") == []
+        assert registry.get_by_country("US") == []
+        return
+    korus = registry.get_by_id("uskr")
+    assert korus is not None
+    assert (korus["id"], korus["agreement_type"], korus["party_count"]) == ("USKR", "fta", 2)
+    assert {p["party_id"] for p in registry.get_parties("USKR")} == {"US", "KR"}
+    ceta = {p["party_id"]: p["party_type"] for p in registry.get_parties("CETA")}
+    assert ceta == {"CA": "country", "EU": "intblock"}
+    france = {row["agreement_id"]: row for row in registry.get_by_country("FR")}
+    assert france["CETA"]["via"] == "EU"
+    assert "USKR" in {row["agreement_id"] for row in registry.get_by_country("US")}
+    usmca = registry.get_by_id("USMCA")
+    assert usmca is not None and usmca["intblock_id"] == "USMCA"
+    for rows in (korus, registry.get_parties("CETA"), list(france.values())):
+        assert_plain(rows)
+
+
+def test_moved_ids_point_to_trade_agreements(client: InternaciaClient) -> None:
+    """Contract 5 moved two-party FTAs from intblocks to trade_agreements under the same id."""
+    resolved = client.intblocks.resolve_id("USKR")
+    assert resolved["id"] == "USKR"
+    if int(client.meta()["contract_version"].split(".")[0]) < 5:
+        assert (resolved["status"], resolved["target_dataset"]) == ("current", "intblocks")
+        return
+    assert (resolved["status"], resolved["target_dataset"]) == ("moved", "trade_agreements")
+    assert client.intblocks.get_by_id("USKR") is None
+    assert client.trade_agreements.get_by_id(resolved["id"]) is not None
+    assert client.intblocks.resolve_id("EU")["target_dataset"] == "intblocks"

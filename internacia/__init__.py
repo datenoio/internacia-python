@@ -32,6 +32,7 @@ from internacia.models import (
     Blocktype,
     CapitalCity,
     Country,
+    CountryTradeAgreement,
     Currency,
     CurrencyEntry,
     IdResolution,
@@ -48,6 +49,8 @@ from internacia.models import (
     SearchResult,
     TimezoneEntry,
     Topic,
+    TradeAgreement,
+    TradeAgreementParty,
 )
 from internacia.version import __version__
 
@@ -85,6 +88,9 @@ __all__ = [
     "LanguageEntry",
     "TimezoneEntry",
     "RegionEntry",
+    "TradeAgreement",
+    "TradeAgreementParty",
+    "CountryTradeAgreement",
     "download_database",
     "get_latest_version",
     "check_for_updates",

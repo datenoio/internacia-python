@@ -34,6 +34,7 @@ from internacia.countries import CountriesClient
 from internacia.intblocks import IntblocksClient
 from internacia.memberships import MembershipsClient
 from internacia.search import SearchClient
+from internacia.trade_agreements import TradeAgreementsClient
 
 # InternaciaClient attribute -> class whose public methods become tools.
 TOOL_CLIENTS: dict[str, type] = {
@@ -41,6 +42,7 @@ TOOL_CLIENTS: dict[str, type] = {
     "intblocks": IntblocksClient,
     "memberships": MembershipsClient,
     "blocktypes": BlocktypesClient,
+    "trade_agreements": TradeAgreementsClient,
     "search": SearchClient,
 }
 
@@ -155,7 +157,11 @@ def _intblock_lookup(client: InternaciaClient, **kwargs: Any) -> Any:
     intblocks = client.intblocks
     if kwargs.get("id"):
         resolved = intblocks.resolve_id(kwargs["id"])
-        return intblocks.get_by_id(resolved["id"]) if resolved["id"] else None
+        if resolved["id"] is None:
+            return None
+        if resolved["target_dataset"] == "trade_agreements":
+            return client.trade_agreements.get_by_id(resolved["id"])
+        return intblocks.get_by_id(resolved["id"])
     results: list[Any]
     if kwargs.get("member_country"):
         results = intblocks.get_by_member(kwargs["member_country"], current_only=True)
@@ -197,8 +203,9 @@ COMPOSITE_TOOLS = [
     Tool(
         "intblock_lookup",
         "Look up international organizations and groups (intblocks) by id, name, member "
-        "country or block type. Retired ids are remapped through aliases; member_country "
-        "returns current memberships only.",
+        "country or block type. Retired ids are remapped through aliases; an id that moved to "
+        "the trade agreements registry (e.g. USKR, CETA) returns the trade agreement. "
+        "member_country returns current memberships only.",
         {
             "type": "object",
             "properties": {

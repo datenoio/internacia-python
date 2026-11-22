@@ -58,6 +58,7 @@ def test_resolution_without_alias_tables(client: InternaciaClient) -> None:
         "since": None,
         "note": None,
         "disambiguated": None,
+        "target_dataset": None,
     }
 
 

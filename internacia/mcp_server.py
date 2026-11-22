@@ -20,7 +20,8 @@ from internacia.version import __version__
 INSTRUCTIONS = (
     "Reference data about countries and international organizations (internacia-db). "
     "Use country codes (ISO 3166-1 alpha-2) and intblock ids as join keys; memberships are "
-    "current unless a tool's current_only argument is false."
+    "current unless a tool's current_only argument is false. Trade agreements (FTAs, customs "
+    "unions) are in the trade_agreements tools; their ids match intblock ids where both exist."
 )
 
 
@@ -66,7 +67,10 @@ def build_server(client: InternaciaClient | None = None) -> Any:
         scope_category: str | None = None,
         blocktype: str | None = None,
     ) -> str:
-        """Look up international organizations by id, name, current member country or block type."""
+        """Look up international organizations by id, name, current member country or block type.
+
+        An id that moved to the trade agreements registry (USKR, CETA) returns the agreement.
+        """
         args = {
             "id": id,
             "name": name,

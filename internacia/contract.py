@@ -15,18 +15,23 @@ logger = logging.getLogger(__name__)
 
 # Contract majors this SDK release supports, oldest first. internacia-db 4.0 changed what
 # ``countries.native_names`` contains (only the country's own languages) and deprecated two
-# membership statuses; no table, column or type the SDK reads changed, so the same code reads
-# 3.x and 4.x databases.
-SUPPORTED_CONTRACT_MAJORS = (3, 4)
+# membership statuses. internacia-db 5.0 added the trade agreements registry
+# (``trade_agreements``, ``trade_agreement_parties``, ``country_trade_agreements``) and moved
+# 34 two-party FTAs out of ``intblocks`` and ``memberships`` into it under the same id
+# (``intblocks_aliases`` reason ``moved``, new column ``target_dataset``). In neither major did
+# a table, column or type the SDK reads change, so the same code reads 3.x, 4.x and 5.x
+# databases; ``client.trade_agreements`` returns nothing on databases before 5.0.
+SUPPORTED_CONTRACT_MAJORS = (3, 4, 5)
 # Newest supported contract major.
 SUPPORTED_CONTRACT_MAJOR = SUPPORTED_CONTRACT_MAJORS[-1]
 # Newest contract this SDK release was tested against.
-TESTED_CONTRACT = (4, 4)
+TESTED_CONTRACT = (5, 0)
 
 
 def supported_majors_text() -> str:
-    """``"3.x or 4.x"``: the supported contract majors, for messages."""
-    return " or ".join(f"{major}.x" for major in SUPPORTED_CONTRACT_MAJORS)
+    """``"3.x, 4.x or 5.x"``: the supported contract majors, for messages."""
+    names = [f"{major}.x" for major in SUPPORTED_CONTRACT_MAJORS]
+    return " or ".join(filter(None, [", ".join(names[:-1]), names[-1]]))
 
 
 def parse_contract(value: str) -> tuple[int, int]:

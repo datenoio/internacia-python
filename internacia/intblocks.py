@@ -146,17 +146,21 @@ class IntblocksClient:
 
     def resolve_id(self, block_id: str) -> IdResolution:
         """
-        Resolve a stored block id that may have been retired, renamed or merged.
+        Resolve a stored block id that may have been retired, renamed, merged or moved.
 
         Returns:
-            ``{"input", "id", "status", "since", "note", "disambiguated"}``: ``status`` is
-            ``current``, an alias reason (``renamed``, ``merged``, ``retired``) with ``id``
-            the replacement (None for ``retired``), or ``unknown``. ``disambiguated`` names
-            the id an entity moved to when ``block_id`` is current but used to mean that
-            entity.
+            ``{"input", "id", "status", "since", "note", "disambiguated", "target_dataset"}``:
+            ``status`` is ``current``, an alias reason (``renamed``, ``merged``, ``moved``,
+            ``retired``) with ``id`` the replacement (None for ``retired``), or ``unknown``.
+            ``disambiguated`` names the id an entity moved to when ``block_id`` is current but
+            used to mean that entity. ``target_dataset`` is the table that holds ``id``:
+            ``intblocks``, or ``trade_agreements`` for the two-party trade agreements that
+            internacia-db 5.0 moved there (``status`` ``moved``; read them with
+            ``client.trade_agreements``).
 
         Example:
             >>> client.intblocks.resolve_id("USAN")["id"]  # "UNASUR"
+            >>> client.intblocks.resolve_id("USKR")["target_dataset"]  # "trade_agreements"
         """
         return resolve(self._db, "intblocks", "id", "intblocks_aliases", block_id.upper())
 

@@ -90,7 +90,7 @@ def test_new_major_is_not_auto_merged(root, monkeypatch, tmp_path_factory):
     out = tmp_path_factory.mktemp("gh") / "output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(out))
     monkeypatch.setattr(
-        "sys.argv", ["data_bump.py", "--version", "v5.0.0", "--pr-body", str(root / "body.md")]
+        "sys.argv", ["data_bump.py", "--version", "v6.0.0", "--pr-body", str(root / "body.md")]
     )
     assert data_bump.main() == 0
     assert _outputs(out)["auto_merge"] == "false"

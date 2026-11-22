@@ -98,15 +98,15 @@ def test_meta_reads_contract_version(tmp_path):
 
 
 def test_unsupported_contract_major_is_rejected(tmp_path):
-    db = make_meta_db(tmp_path / "db.duckdb", version="5.0.0", contract_version="5.0")
-    with pytest.raises(ContractError, match="requires contract 3.x or 4.x"):
+    db = make_meta_db(tmp_path / "db.duckdb", version="6.0.0", contract_version="6.0")
+    with pytest.raises(ContractError, match=r"requires contract 3\.x, 4\.x or 5\.x"):
         InternaciaClient(db_path=db)
-    assert InternaciaClient(db_path=db, check_contract=False).meta()["contract_version"] == "5.0"
+    assert InternaciaClient(db_path=db, check_contract=False).meta()["contract_version"] == "6.0"
 
 
-def test_contract_majors_3_and_4_are_accepted(tmp_path, caplog):
+def test_contract_majors_3_4_and_5_are_accepted(tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger="internacia.contract"):
-        for version in ("3.1.0", "4.0.0"):
+        for version in ("3.1.0", "4.0.0", "4.4.0", "5.0.0"):
             db = make_meta_db(
                 tmp_path / f"{version}.duckdb", version=version, contract_version=version[:3]
             )
@@ -115,7 +115,7 @@ def test_contract_majors_3_and_4_are_accepted(tmp_path, caplog):
 
 
 def test_newer_contract_minor_warns(tmp_path, caplog):
-    db = make_meta_db(tmp_path / "db.duckdb", version="4.9.0", contract_version="4.9")
+    db = make_meta_db(tmp_path / "db.duckdb", version="5.9.0", contract_version="5.9")
     with caplog.at_level(logging.WARNING, logger="internacia.contract"):
         InternaciaClient(db_path=db)
     assert "newer than" in caplog.text

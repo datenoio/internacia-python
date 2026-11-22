@@ -1,4 +1,4 @@
-"""Resolution of retired, renamed and merged identifiers through internacia-db alias tables."""
+"""Resolution of retired, renamed, merged and moved ids through internacia-db alias tables."""
 
 from internacia.database import DatabaseManager
 from internacia.models import IdResolution
@@ -9,6 +9,12 @@ def resolve(
 ) -> IdResolution:
     """
     Resolve ``value`` against ``table.key`` and the alias table.
+
+    ``target_dataset`` names the table to look ``id`` up in: ``table`` itself, or the
+    alias row's ``target_dataset`` (internacia-db 5.0 and later), which is
+    ``trade_agreements`` for ids that moved to the trade agreements registry
+    (``reason = moved``). Alias tables without that column (internacia-db 3.x and 4.x)
+    always point into ``table``.
 
     Databases without alias tables (internacia-db 3.0.0) can only report ``current`` or
     ``unknown``.
@@ -25,6 +31,7 @@ def resolve(
         "since": None,
         "note": None,
         "disambiguated": None,
+        "target_dataset": table if exists else None,
     }
     if alias is None:
         return result
@@ -36,4 +43,6 @@ def resolve(
         return result
     result["status"] = alias.get("reason") or "renamed"
     result["id"] = alias.get("target") or None
+    if result["id"] is not None:
+        result["target_dataset"] = alias.get("target_dataset") or table
     return result
