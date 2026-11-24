@@ -25,7 +25,7 @@ SUPPORTED_CONTRACT_MAJORS = (3, 4, 5)
 # Newest supported contract major.
 SUPPORTED_CONTRACT_MAJOR = SUPPORTED_CONTRACT_MAJORS[-1]
 # Newest contract this SDK release was tested against.
-TESTED_CONTRACT = (5, 1)
+TESTED_CONTRACT = (5, 2)
 
 
 def supported_majors_text() -> str:
